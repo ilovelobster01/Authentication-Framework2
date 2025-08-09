@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  app:
+    build: ./app
+    container_name: authdemo_app
+    environment:
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+    expose:
+      - "8000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: authdemo_nginx
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./nginx/dev/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./scripts/ca/out/server:/etc/nginx/certs:ro
+      - ./scripts/ca/ca/certs:/etc/nginx/ca/certs:ro
+      - ./scripts/ca/ca/crl:/etc/nginx/ca/crl:ro
+    depends_on:
+      - app

@@ -1,0 +1,701 @@
+<!-- Tor Status Component -->
+<div id="torStatusWidget" class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-shield-lock me-2"></i>
+            <h6 class="mb-0">Tor Proxy Status</h6>
+            <small id="torStatusBadge" class="badge bg-secondary ms-2">Loading...</small>
+        </div>
+        <div class="d-flex align-items-center">
+            <div id="torStatusIndicator" class="status-indicator me-2">
+                <span class="spinner-border spinner-border-sm" role="status"></span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" id="torRefreshBtn" onclick="refreshTorStatus(true)">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </div>
+    <div class="card-body" id="torStatusBody">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 mb-0">Checking Tor status...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Tor Control Modal (Admin Only) -->
+{% if current_user.has_role('admin') %}
+<div class="modal fade" id="torControlModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tor Control Panel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="torControlBody">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.status-indicator .status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.status-connected { background-color: #28a745; }
+.status-running { background-color: #ffc107; }
+.status-disconnected { background-color: #dc3545; }
+.status-disabled { background-color: #6c757d; }
+.status-error { background-color: #fd7e14; }
+
+.circuit-path {
+    font-family: monospace;
+    font-size: 0.85em;
+    background: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+/* Dark theme styling for Tor control modal */
+[data-theme="dark"] #torControlModal .modal-content {
+    background-color: #6c757d !important;
+    color: #fff !important;
+    border: 1px solid #495057;
+}
+
+[data-theme="dark"] #torControlModal .modal-header {
+    border-bottom-color: #495057;
+}
+
+[data-theme="dark"] #torControlModal .btn-close {
+    filter: invert(1);
+}
+
+[data-theme="dark"] #torControlModal .bg-light {
+    background-color: #5a6268 !important;
+}
+
+[data-theme="dark"] #torControlModal code {
+    background-color: #495057;
+    color: #fff;
+}
+
+/* Custom styling for connection test results */
+.alert-sm {
+    font-size: 0.875rem;
+}
+
+#testConnectionResult .alert {
+    margin-bottom: 0;
+    border: 1px solid;
+}
+
+#testConnectionResult .alert-success {
+    border-color: #d1e7dd;
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+#testConnectionResult .alert-danger {
+    border-color: #f5c2c7;
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+#testConnectionResult .alert-warning {
+    border-color: #ffecb5;
+    background-color: #fff3cd;
+    color: #664d03;
+}
+</style>
+
+<script>
+let torStatusData = null;
+
+async function refreshTorStatus(forceRefresh = false) {
+    const indicator = document.getElementById('torStatusIndicator');
+    const body = document.getElementById('torStatusBody');
+    const refreshBtn = document.getElementById('torRefreshBtn');
+    
+    // Initialize cache if not already done
+    if (!window.torStatusCache) {
+        window.torStatusCache = {
+            data: null,
+            lastFetch: 0,
+            maxAge: 30000, // 30 seconds
+            isValid() {
+                return this.data && (Date.now() - this.lastFetch) < this.maxAge;
+            },
+            set(data) {
+                this.data = data;
+                this.lastFetch = Date.now();
+                try {
+                    sessionStorage.setItem('torStatusCache', JSON.stringify({
+                        data: this.data,
+                        lastFetch: this.lastFetch
+                    }));
+                } catch (e) {}
+            },
+            restore() {
+                try {
+                    const cached = sessionStorage.getItem('torStatusCache');
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        this.data = parsed.data;
+                        this.lastFetch = parsed.lastFetch;
+                    }
+                } catch (e) {}
+            }
+        };
+    }
+    
+    // Restore from sessionStorage on first load
+    if (!window.torStatusCache.data) {
+        window.torStatusCache.restore();
+    }
+    
+    try {
+        // Use cached data if available and not forcing refresh
+        if (!forceRefresh && window.torStatusCache.isValid()) {
+            console.log('🚀 Using cached Tor status (dashboard fast load)');
+            torStatusData = window.torStatusCache.data;
+            updateTorStatusDisplay(torStatusData);
+            
+            if (torStatusData.running && !torStatusData.connection_tested) {
+                addConnectionTestButton();
+            }
+            return;
+        }
+        
+        // Show loading state only if no cached data
+        if (!window.torStatusCache.data) {
+            indicator.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+        } else {
+            // Show cached data while fetching fresh data
+            torStatusData = window.torStatusCache.data;
+            updateTorStatusDisplay(torStatusData);
+            if (torStatusData.running && !torStatusData.connection_tested) {
+                addConnectionTestButton();
+            }
+        }
+        
+        refreshBtn.disabled = true;
+        
+        // Fetch basic status (fast)
+        console.log('🔄 Fetching fresh Tor status (dashboard)...');
+        const response = await fetch('/api/tor/status');
+        if (!response.ok) {
+            throw new Error('Failed to fetch Tor status');
+        }
+        
+        const freshData = await response.json();
+        
+        // Update cache and display
+        window.torStatusCache.set(freshData);
+        torStatusData = freshData;
+        updateTorStatusDisplay(torStatusData);
+        
+        // If status looks good, optionally test connection (slower)
+        if (torStatusData.running && !torStatusData.connection_tested) {
+            // Add a "Test Connection" button instead of automatic testing
+            addConnectionTestButton();
+        }
+        
+    } catch (error) {
+        console.error('Error fetching Tor status:', error);
+        
+        // Fall back to cached data if available
+        if (window.torStatusCache.data) {
+            console.log('⚠️ Using stale cached data due to fetch error (dashboard)');
+            torStatusData = window.torStatusCache.data;
+            updateTorStatusDisplay(torStatusData);
+            if (torStatusData.running && !torStatusData.connection_tested) {
+                addConnectionTestButton();
+            }
+        } else {
+            // No cached data available, show error
+            indicator.innerHTML = '<span class="status-dot status-error"></span>';
+            body.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Error loading Tor status: ${error.message}
+                </div>
+            `;
+        }
+    } finally {
+        refreshBtn.disabled = false;
+    }
+}
+
+function updateMainStatusElements(data) {
+    // Update only the status indicator and IP/country fields without rebuilding the entire body
+    const indicator = document.getElementById('torStatusIndicator');
+    const statusBadge = document.getElementById('torStatusBadge');
+    
+    // Update status indicator and badge
+    let statusClass, statusText, badgeClass, badgeText;
+    if (!data.enabled) {
+        statusClass = 'status-disabled';
+        statusText = 'Disabled';
+        badgeClass = 'bg-secondary';
+        badgeText = 'Disabled';
+    } else if (!data.running) {
+        statusClass = 'status-disconnected';
+        statusText = 'Disconnected';
+        badgeClass = 'bg-danger';
+        badgeText = 'Disconnected';
+    } else if (data.connection_tested === false) {
+        statusClass = 'status-running';
+        statusText = 'Running (not tested)';
+        badgeClass = 'bg-warning';
+        badgeText = 'Running';
+    } else if (data.connection_working) {
+        statusClass = 'status-connected';
+        statusText = 'Connected';
+        badgeClass = 'bg-success';
+        badgeText = 'Connected';
+    } else {
+        statusClass = 'status-error';
+        statusText = 'Error';
+        badgeClass = 'bg-danger';
+        badgeText = 'Failed';
+    }
+    
+    indicator.innerHTML = `<span class="status-dot ${statusClass}" title="${statusText}"></span>`;
+    
+    // Update status badge
+    statusBadge.className = `badge ${badgeClass} ms-2`;
+    statusBadge.textContent = badgeText;
+    
+    // Update IP and country displays in existing elements if they exist
+    const ipElements = document.querySelectorAll('.current-ip-display');
+    const countryElements = document.querySelectorAll('.current-country-display');
+    
+    const displayIP = data.current_ip || data.connection_test?.ip_address || 'Unknown';
+    const displayCountry = data.country || data.connection_test?.country || 'Unknown';
+    
+    ipElements.forEach(el => el.textContent = displayIP);
+    countryElements.forEach(el => el.textContent = displayCountry);
+}
+
+function updateTorStatusDisplay(data) {
+    const indicator = document.getElementById('torStatusIndicator');
+    const body = document.getElementById('torStatusBody');
+    const statusBadge = document.getElementById('torStatusBadge');
+    
+    // Update status indicator and badge
+    let statusClass, statusText, badgeClass, badgeText;
+    if (!data.enabled) {
+        statusClass = 'status-disabled';
+        statusText = 'Disabled';
+        badgeClass = 'bg-secondary';
+        badgeText = 'Disabled';
+    } else if (!data.running) {
+        statusClass = 'status-disconnected';
+        statusText = 'Disconnected';
+        badgeClass = 'bg-danger';
+        badgeText = 'Disconnected';
+    } else if (data.connection_tested === false) {
+        statusClass = 'status-running';
+        statusText = 'Running (not tested)';
+        badgeClass = 'bg-warning';
+        badgeText = 'Running';
+    } else if (data.connection_working) {
+        statusClass = 'status-connected';
+        statusText = 'Connected';
+        badgeClass = 'bg-success';
+        badgeText = 'Connected';
+    } else {
+        statusClass = 'status-error';
+        statusText = 'Error';
+        badgeClass = 'bg-danger';
+        badgeText = 'Failed';
+    }
+    
+    indicator.innerHTML = `<span class="status-dot ${statusClass}" title="${statusText}"></span>`;
+    
+    // Update status badge
+    statusBadge.className = `badge ${badgeClass} ms-2`;
+    statusBadge.textContent = badgeText;
+    
+    // Update body content
+    if (!data.enabled) {
+        body.innerHTML = `
+            <div class="text-center">
+                <i class="bi bi-shield-x text-muted" style="font-size: 2rem;"></i>
+                <p class="mt-2 mb-0 text-muted">Tor proxy is disabled</p>
+                ${data.error ? `<small class="text-danger">${data.error}</small>` : ''}
+            </div>
+        `;
+    } else if (!data.running) {
+        body.innerHTML = `
+            <div class="text-center">
+                <i class="bi bi-shield-exclamation text-warning" style="font-size: 2rem;"></i>
+                <p class="mt-2 mb-0 text-warning">Tor is not running</p>
+                ${data.error ? `<small class="text-danger">${data.error}</small>` : ''}
+                {% if current_user.has_role('admin') %}
+                <button class="btn btn-sm btn-primary mt-2" onclick="showTorControl()">
+                    <i class="bi bi-gear me-1"></i>Control Panel
+                </button>
+                {% endif %}
+            </div>
+        `;
+    } else {
+        // Tor is running - show detailed status
+        const connectionTest = data.connection_test || {};
+        
+        // Determine IP and country to display
+        let displayIP, displayCountry;
+        if (data.connection_tested === false) {
+            // Basic status - use cached data or show helpful message
+            if (data.current_ip) {
+                displayIP = data.current_ip;
+                displayCountry = data.country || 'Unknown location';
+            } else {
+                displayIP = 'Test connection to see IP';
+                displayCountry = 'Test connection to see location';
+            }
+        } else {
+            // Connection tested - use test results or cached data
+            displayIP = connectionTest.ip_address || data.current_ip || 'Unknown';
+            displayCountry = connectionTest.country || data.country || 'Unknown';
+        }
+        
+        body.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Status:</span>
+                        <span class="badge bg-success">Running</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted">Version:</span>
+                        <span>${data.version || 'Unknown'}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted">Circuits:</span>
+                        <span>${data.circuits} active</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Current IP:</span>
+                        <span class="circuit-path current-ip-display ${data.connection_tested === false && !data.current_ip ? 'text-info fst-italic' : ''}">${displayIP}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted">Country:</span>
+                        <span class="current-country-display ${data.connection_tested === false && !data.current_ip ? 'text-info fst-italic' : ''}">${displayCountry}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted">SOCKS Port:</span>
+                        <span>${data.socks_port}</span>
+                    </div>
+                    ${data.current_circuit && data.current_circuit.circuit_id ? `
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted">Circuit ID:</span>
+                        <span class="circuit-path">${data.current_circuit.circuit_id}</span>
+                    </div>
+                    ` : ''}
+                    ${data.current_circuit && data.current_circuit.exit_country ? `
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted">Exit Country:</span>
+                        <span>${data.current_circuit.exit_country}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+            
+            ${data.circuit_details && data.circuit_details.length > 0 ? `
+            <hr>
+            <div class="mb-2">
+                <small class="text-muted">Active Circuits:</small>
+            </div>
+            ${data.circuit_details.slice(0, 3).map(circuit => `
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small>Circuit ${circuit.id}</small>
+                    <small class="circuit-path">${circuit.path.slice(0, 2).join(' → ')}</small>
+                    <small class="badge bg-secondary">${circuit.status}</small>
+                </div>
+            `).join('')}
+            ` : ''}
+            
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary" onclick="requestNewCircuit()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>New Circuit
+                </button>
+                {% if current_user.has_role('admin') %}
+                <button class="btn btn-sm btn-outline-secondary" onclick="showTorControl()">
+                    <i class="bi bi-gear me-1"></i>Control
+                </button>
+                {% endif %}
+            </div>
+        `;
+    }
+}
+
+async function requestNewCircuit() {
+    try {
+        const response = await fetch('/api/tor/control', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({ action: 'new_circuit' })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Refresh status after a moment, but preserve test button
+            setTimeout(() => refreshTorStatus(true), 2000);
+            
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-2';
+            alertDiv.innerHTML = `
+                <i class="bi bi-check-circle me-2"></i>${result.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.getElementById('torStatusBody').appendChild(alertDiv);
+            
+            // Auto-dismiss after 3 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 3000);
+        } else {
+            throw new Error(result.error || 'Failed to request new circuit');
+        }
+        
+    } catch (error) {
+        console.error('Error requesting new circuit:', error);
+        alert('Failed to request new circuit: ' + error.message);
+    }
+}
+
+{% if current_user.has_role('admin') %}
+async function showTorControl() {
+    const modal = new bootstrap.Modal(document.getElementById('torControlModal'));
+    const body = document.getElementById('torControlBody');
+    
+    body.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading control panel...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Load detailed status for control panel
+    try {
+        await refreshTorStatus();
+        
+        body.innerHTML = `
+            <div class="mb-3">
+                <h6>Current Status</h6>
+                <div class="bg-light dark:bg-dark p-3 rounded border">
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Status</small>
+                            <span class="badge ${torStatusData.running ? 'bg-success' : 'bg-danger'}">
+                                ${torStatusData.running ? 'Running' : 'Stopped'}
+                            </span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">IP Address</small>
+                            <code>${torStatusData.connection_test?.ip_address || 'Unknown'}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <h6>Actions</h6>
+                <div class="d-grid gap-2">
+                    ${torStatusData.running ? `
+                        <button class="btn btn-warning" onclick="controlTor('restart')">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Restart Tor
+                        </button>
+                        <button class="btn btn-danger" onclick="controlTor('disable')">
+                            <i class="bi bi-stop-circle me-2"></i>Stop Tor
+                        </button>
+                    ` : `
+                        <button class="btn btn-success" onclick="controlTor('enable')">
+                            <i class="bi bi-play-circle me-2"></i>Start Tor
+                        </button>
+                    `}
+                    <button class="btn btn-outline-primary" onclick="controlTor('new_circuit')">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Request New Circuit
+                    </button>
+                </div>
+            </div>
+            
+            ${torStatusData.error ? `
+                <div class="alert alert-danger">
+                    <h6>Error</h6>
+                    <code>${torStatusData.error}</code>
+                </div>
+            ` : ''}
+        `;
+        
+    } catch (error) {
+        body.innerHTML = `
+            <div class="alert alert-danger">
+                Error loading control panel: ${error.message}
+            </div>
+        `;
+    }
+}
+
+async function controlTor(action) {
+    try {
+        const response = await fetch('/api/tor/control', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({ action })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(result.message);
+            bootstrap.Modal.getInstance(document.getElementById('torControlModal')).hide();
+            setTimeout(refreshTorStatus, 2000);
+        } else {
+            throw new Error(result.error || 'Action failed');
+        }
+        
+    } catch (error) {
+        console.error('Tor control error:', error);
+        alert('Error: ' + error.message);
+    }
+}
+{% endif %}
+
+function addConnectionTestButton() {
+    const body = document.getElementById('torStatusBody');
+    
+    // Add test connection button to existing content
+    const testButton = document.createElement('div');
+    testButton.className = 'mt-3 text-center';
+    testButton.innerHTML = `
+        <button id="testConnectionBtn" class="btn btn-sm btn-outline-info" onclick="testTorConnection()">
+            <i class="bi bi-wifi me-1"></i>Test Connection
+        </button>
+        <small class="d-block mt-1 text-muted">Click to verify external connectivity</small>
+        <div id="testConnectionResult" class="mt-2" style="display: none;"></div>
+    `;
+    
+    body.appendChild(testButton);
+}
+
+async function testTorConnection() {
+    const btn = document.getElementById('testConnectionBtn');
+    const resultDiv = document.getElementById('testConnectionResult');
+    const originalHTML = btn.innerHTML;
+    
+    try {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing...';
+        btn.disabled = true;
+        resultDiv.style.display = 'none';
+        
+        const response = await fetch('/api/tor/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Connection test failed');
+        }
+        
+        const result = await response.json();
+        
+        // Update the display with test results
+        torStatusData.connection_tested = true;
+        torStatusData.connection_working = result.connection_working;
+        torStatusData.current_ip = result.ip_address;  // Store in correct field
+        torStatusData.country = result.country;
+        
+        // Also update cache so other pages benefit
+        if (window.torStatusCache) {
+            window.torStatusCache.data.current_ip = result.ip_address;
+            window.torStatusCache.data.country = result.country;
+            window.torStatusCache.data.connection_tested = true;
+            window.torStatusCache.data.connection_working = result.connection_working;
+            window.torStatusCache.set(window.torStatusCache.data);  // Update cache
+        }
+        
+        // Don't call updateTorStatusDisplay here as it would remove our test button
+        // Instead, just update the main status display elements directly
+        updateMainStatusElements(torStatusData);
+        
+        // Show persistent result
+        if (result.connection_working) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success alert-sm py-2">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong>Connection verified</strong><br>
+                    <small>Exit IP: ${result.ip_address} (${result.country || 'Unknown location'})</small>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger alert-sm py-2">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Connection failed</strong><br>
+                    <small>${result.error || 'Unable to connect through Tor'}</small>
+                </div>
+            `;
+        }
+        
+        resultDiv.style.display = 'block';
+        
+        // Update button to show "Test Again"
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Test Again';
+        btn.disabled = false;
+        
+    } catch (error) {
+        console.error('Connection test error:', error);
+        
+        // Show persistent error result
+        resultDiv.innerHTML = `
+            <div class="alert alert-warning alert-sm py-2">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Test failed</strong><br>
+                <small>Error: ${error.message}</small>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+        
+        // Update button to show "Retry Test"
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Retry Test';
+        btn.disabled = false;
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshTorStatus();
+    
+    // Auto-refresh every 2 minutes (less frequent to reduce load)
+    setInterval(refreshTorStatus, 120000);
+});
+</script>

@@ -1,0 +1,166 @@
+{% extends "base_new.html" %}
+
+{% block title %}Audit Logs - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-list-ul"></i> Audit Logs</h2>
+        <p class="text-muted mb-0">Monitor user activities and system events</p>
+    </div>
+    <div class="badge bg-danger">Administrator Access</div>
+</div>
+
+<!-- Coming Soon Alert -->
+<div class="alert alert-warning" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle fs-4 me-3"></i>
+        <div>
+            <h5 class="alert-heading mb-1">Audit Logs Viewer Coming Soon</h5>
+            <p class="mb-0">The audit logs interface is being developed. You'll be able to view, search, and filter all user activities and system events from this page.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Placeholder Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-funnel"></i> Log Filters</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Event Type</label>
+                <select class="form-select" disabled>
+                    <option>All Events</option>
+                    <option>Login/Logout</option>
+                    <option>Search Activities</option>
+                    <option>User Management</option>
+                    <option>System Changes</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">User</label>
+                <input type="text" class="form-control" placeholder="Filter by username" disabled>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date Range</label>
+                <select class="form-select" disabled>
+                    <option>Last 24 hours</option>
+                    <option>Last 7 days</option>
+                    <option>Last 30 days</option>
+                    <option>Custom range</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-primary d-block w-100" disabled>
+                    <i class="bi bi-search"></i> Search Logs
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Placeholder Log Entries -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-clock-history"></i> Recent Activities</h6>
+        <div class="badge bg-secondary">Demo Data</div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Event</th>
+                        <th>Description</th>
+                        <th>IP Address</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody class="text-muted">
+                    <tr>
+                        <td><small>2025-01-21 10:15:32</small></td>
+                        <td><span class="badge bg-primary">admin</span></td>
+                        <td>admin_access</td>
+                        <td>Accessed admin panel</td>
+                        <td>127.0.0.1</td>
+                        <td><span class="badge bg-success">Success</span></td>
+                    </tr>
+                    <tr>
+                        <td><small>2025-01-21 10:12:15</small></td>
+                        <td><span class="badge bg-info">user</span></td>
+                        <td>search_created</td>
+                        <td>Started Sherlock search</td>
+                        <td>192.168.1.100</td>
+                        <td><span class="badge bg-success">Success</span></td>
+                    </tr>
+                    <tr>
+                        <td><small>2025-01-21 10:08:45</small></td>
+                        <td><span class="badge bg-info">jaw</span></td>
+                        <td>login</td>
+                        <td>User logged in successfully</td>
+                        <td>10.0.0.5</td>
+                        <td><span class="badge bg-success">Success</span></td>
+                    </tr>
+                    <tr>
+                        <td><small>2025-01-21 10:05:22</small></td>
+                        <td><span class="badge bg-warning">unknown</span></td>
+                        <td>login_failed</td>
+                        <td>Failed login attempt</td>
+                        <td>203.0.113.42</td>
+                        <td><span class="badge bg-danger">Failed</span></td>
+                    </tr>
+                    <tr>
+                        <td><small>2025-01-21 09:58:10</small></td>
+                        <td><span class="badge bg-info">user</span></td>
+                        <td>profile_update</td>
+                        <td>Updated user profile</td>
+                        <td>172.16.0.10</td>
+                        <td><span class="badge bg-success">Success</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="text-center text-muted py-4 border-top">
+            <i class="bi bi-hourglass-split fs-1 mb-3"></i>
+            <h5>Full Audit Log System Coming Soon</h5>
+            <p>This will include:</p>
+            <div class="row">
+                <div class="col-md-4">
+                    <ul class="list-unstyled">
+                        <li>• Real-time log streaming</li>
+                        <li>• Advanced search & filtering</li>
+                        <li>• Export capabilities</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <ul class="list-unstyled">
+                        <li>• Event correlation</li>
+                        <li>• Security alerting</li>
+                        <li>• Compliance reporting</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <ul class="list-unstyled">
+                        <li>• Log retention policies</li>
+                        <li>• Automated archiving</li>
+                        <li>• Dashboard integration</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Back Button -->
+<div class="mt-4">
+    <a href="{{ url_for('admin.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Admin Dashboard
+    </a>
+</div>
+{% endblock %}

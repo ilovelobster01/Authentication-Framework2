@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ current_user.theme if current_user.is_authenticated else 'light' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1" rel="stylesheet">
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{% if current_user.is_authenticated and current_user.is_admin %}{{ url_for('admin.index') }}{% else %}{{ url_for('main.index') }}{% endif %}">
+                <i class="bi bi-shield-check"></i> TIOS Web Toolkit
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user.is_authenticated %}
+                <!-- Authenticated Navigation -->
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('investigations.index') }}">
+                            <i class="bi bi-folder"></i> Investigations
+                        </a>
+                    </li>
+                    
+                    <!-- Results Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-clipboard-data"></i> Results
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('searches.index') }}">
+                                <i class="bi bi-search"></i> Searches
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('downloads.index') }}">
+                                <i class="bi bi-download"></i> Downloads
+                            </a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- Tools Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-tools"></i> Tools
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><h6 class="dropdown-header">Searchers</h6></li>
+                            {% if current_user.has_permission('holehe') %}
+                            <li><a class="dropdown-item" href="{{ url_for('main.holehe') }}">📧 Holehe</a></li>
+                            {% endif %}
+                            {% if current_user.has_permission('sherlock') %}
+                            <li><a class="dropdown-item" href="{{ url_for('main.sherlock') }}">🔍 Sherlock</a></li>
+                            {% endif %}
+                            {% if current_user.has_permission('instaloader') %}
+                            <li><a class="dropdown-item" href="{{ url_for('main.instaloader') }}">📸 Instaloader</a></li>
+                            {% endif %}
+                            {% if current_user.has_permission('telegram') %}
+                            <li><a class="dropdown-item" href="{{ url_for('main.telegram') }}">💬 Telegram</a></li>
+                            {% endif %}
+                            {% if current_user.has_permission('ghunt') %}
+                            <li><a class="dropdown-item" href="{{ url_for('main.ghunt') }}">🔍 GHunt</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Downloaders</h6></li>
+                            {% if current_user.has_permission('video_downloader') %}
+                            <li><a class="dropdown-item" href="{{ url_for('main.video_downloader') }}">📹 Video Downloader</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    
+                </ul>
+                
+                <!-- User Menu -->
+                <ul class="navbar-nav">
+                    <!-- Admin Menu -->
+                    {% if current_user.is_admin %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-gear"></i> Admin
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('admin.index') }}">
+                                <i class="bi bi-speedometer2"></i> Admin Dashboard
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('certificates.index') }}">
+                                <i class="bi bi-shield-check"></i> Certificate Management
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    <!-- User Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ current_user.full_name }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ url_for('main.profile') }}">
+                                <i class="bi bi-person"></i> Profile
+                                {% if current_user.are_ghunt_cookies_valid() %}
+                                <span class="badge bg-success ms-1">Auth</span>
+                                {% endif %}
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.settings') }}">
+                                <i class="bi bi-gear"></i> Settings
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('certificates.my_certificate') }}">
+                                <i class="bi bi-shield-person"></i> My Certificate
+                                {% set cert_status = current_user.certificate_status %}
+                                {% if cert_status == 'Valid' %}
+                                    <span class="badge bg-success ms-1">Valid</span>
+                                {% elif cert_status == 'Expiring Soon' %}
+                                    <span class="badge bg-warning ms-1">Expiring</span>
+                                {% elif cert_status in ['Expired', 'Revoked'] %}
+                                    <span class="badge bg-danger ms-1">{{ cert_status }}</span>
+                                {% elif cert_status == 'No Certificate' %}
+                                    <span class="badge bg-secondary ms-1">None</span>
+                                {% endif %}
+                            </a></li>
+                            {% if current_user.is_admin %}
+                            <li><a class="dropdown-item" href="{{ url_for('system.health') }}">
+                                <i class="bi bi-heart-pulse"></i> System Health
+                            </a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="dropdown-item-text">
+                                <small class="text-muted">
+                                    <i class="bi bi-shield-check me-1"></i>
+                                    {% if current_user.are_ghunt_cookies_valid() %}
+                                    <span class="text-success">GHunt Auth: Valid</span>
+                                    {% else %}
+                                    <span class="text-warning">GHunt Auth: None</span>
+                                    {% endif %}
+                                </small>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('security.logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- Theme Toggle -->
+                    <li class="nav-item">
+                        <button class="btn btn-outline-light btn-sm ms-2" id="themeToggle" title="Toggle Theme">
+                            <i class="bi bi-moon-fill" id="themeIcon"></i>
+                        </button>
+                    </li>
+                </ul>
+                {% else %}
+                <!-- Public Navigation -->
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('maintenance_auth.maintenance_status') }}">
+                            <i class="bi bi-gear"></i> System Status
+                        </a>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+    
+    <!-- Main Content -->
+    <main class="flex-grow-1">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="bg-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0">&copy; 2025 {{ app_name }} v{{ app_version }}</p>
+                    <small class="text-muted">Professional OSINT Investigation Platform</small>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <small class="text-muted">
+                        For educational and defensive security purposes only
+                    </small>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main_new.js') }}"></script>
+    
+    {% block scripts %}{% endblock %}
+    
+    <!-- Theme Toggle Script -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const htmlElement = document.documentElement;
+        
+        if (themeToggle) {
+            // Update icon based on current theme
+            function updateThemeIcon() {
+                const currentTheme = htmlElement.getAttribute('data-theme');
+                if (currentTheme === 'dark') {
+                    themeIcon.className = 'bi bi-sun-fill';
+                } else {
+                    themeIcon.className = 'bi bi-moon-fill';
+                }
+            }
+            
+            updateThemeIcon();
+            
+            themeToggle.addEventListener('click', async function() {
+                try {
+                    const response = await fetch('{{ url_for("auth.toggle_theme") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        htmlElement.setAttribute('data-theme', data.theme);
+                        updateThemeIcon();
+                    } else {
+                        console.error('Theme toggle failed:', response.status, response.statusText);
+                    }
+                } catch (error) {
+                    console.error('Error toggling theme:', error);
+                }
+            });
+        }
+        
+        
+        // Global CSRF Protection Setup
+        const csrfToken = document.querySelector('meta[name=csrf-token]')?.getAttribute('content');
+        
+        // Automatically add CSRF tokens to all forms that don't have one
+        document.querySelectorAll('form').forEach(form => {
+            if (form.method.toLowerCase() !== 'get' && !form.querySelector('input[name="csrf_token"]')) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken || '';
+                form.appendChild(csrfInput);
+            }
+        });
+        
+        // Setup global AJAX CSRF headers
+        if (window.jQuery) {
+            // jQuery AJAX setup
+            $.ajaxSetup({
+                beforeSend: function(xhr, settings) {
+                    if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                        xhr.setRequestHeader("X-CSRFToken", csrfToken || '');
+                    }
+                }
+            });
+        }
+        
+        // Fetch API wrapper with CSRF protection
+        window.csrfFetch = function(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken || ''
+                }
+            };
+            
+            return fetch(url, {
+                ...defaultOptions,
+                ...options,
+                headers: {
+                    ...defaultOptions.headers,
+                    ...options.headers
+                }
+            });
+        };
+    });
+    </script>
+</body>
+</html>

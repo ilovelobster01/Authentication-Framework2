@@ -1,0 +1,697 @@
+{% extends "base_new.html" %}
+
+{% block title %}Instaloader - Instagram Analysis{% endblock %}
+
+{% block head %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-2">📸 Instagram Profile Analysis</h1>
+                <p class="text-muted mb-0">Analyze Instagram profiles, posts, and engagement metrics</p>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-success fs-6">🟢 Active</span>
+                <br>
+                <small class="text-muted">instaloader v1.0.0</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Profile Analysis</h5>
+            </div>
+            <div class="card-body">
+                <form id="instaloaderForm">
+                    <!-- Investigation Selection -->
+                    <div class="mb-3">
+                        <label for="investigationSelect" class="form-label">Link to Investigation</label>
+                        <div class="input-group">
+                            <select class="form-select" id="investigationSelect" name="investigation_id" required>
+                                <option value="">Select an investigation</option>
+                                {% for investigation in investigations %}
+                                <option value="{{ investigation.id }}">
+                                    {{ investigation.name }}
+                                    {% if investigation.case_number %} - {{ investigation.case_number }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <a href="{{ url_for('investigations.create') }}" class="btn btn-outline-secondary" title="Create New Investigation">
+                                <i class="bi bi-plus-circle"></i>
+                            </a>
+                        </div>
+                        <div class="form-text">This analysis will be linked to the selected investigation</div>
+                    </div>
+                    
+                    <!-- Profile to analyze -->
+                    <div class="mb-3">
+                        <label for="profileInput" class="form-label">Instagram Profile to Analyze</label>
+                        <div class="input-group">
+                            <span class="input-group-text">@</span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="profileInput" 
+                                   placeholder="username"
+                                   pattern="[a-zA-Z0-9._]{1,30}"
+                                   title="Instagram username (letters, numbers, dots, underscores)"
+                                   required>
+                        </div>
+                        <small class="form-text text-muted">Public profiles work without login. Private profiles require authentication.</small>
+                    </div>
+
+                    <!-- Authentication section -->
+                    <div class="card border-warning mb-3">
+                        <div class="card-header bg-warning bg-opacity-10">
+                            <h6 class="mb-0">🔐 Authentication (Optional)</h6>
+                            <small class="text-muted">Required for private profiles and enhanced data</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="usernameInput" class="form-label">Your Instagram Username</label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="usernameInput" 
+                                               placeholder="your_username"
+                                               autocomplete="username">
+                                        <small class="form-text text-muted">Your own Instagram account username</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="passwordInput" class="form-label">Your Instagram Password</label>
+                                        <input type="password" 
+                                               class="form-control" 
+                                               id="passwordInput" 
+                                               placeholder="your_password"
+                                               autocomplete="current-password">
+                                        <small class="form-text text-muted">Not stored or logged</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info mb-0">
+                                <small>
+                                    <strong>Privacy Notice:</strong> Credentials are used only for this analysis and are not stored. 
+                                    Use a dedicated Instagram account for OSINT investigations.
+                                </small>
+                            </div>
+                            
+                            <!-- Authentication Status Indicator -->
+                            <div id="authStatusIndicator" class="mt-3" style="display: none;">
+                                <div class="alert mb-0" id="authStatusAlert">
+                                    <small>
+                                        <strong>Authentication Status:</strong> <span id="authStatusText"></span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Options -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="forceRedoCheck">
+                                <label class="form-check-label" for="forceRedoCheck">
+                                    <small>Force redo (ignore duplicate detection)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                        <button class="btn btn-primary flex-fill" type="submit" id="analyzeButton">
+                            <span id="buttonText">Analyze Profile</span>
+                            <span id="loadingSpinner" class="spinner-border spinner-border-sm loading-spinner" role="status"></span>
+                        </button>
+                        <button class="btn btn-outline-secondary" type="button" id="newSearchButton">
+                            <i class="bi bi-plus-circle"></i> New Search
+                        </button>
+                    </div>
+                    
+                </form>
+                
+                <div id="alertContainer" class="mt-3"></div>
+                
+                <!-- Rate Limiting Warning -->
+                <div class="alert alert-warning mt-3">
+                    <h6 class="mb-2">⚠️ Instagram Rate Limiting Notice</h6>
+                    <small>
+                        <strong>Current Status:</strong> Instagram has implemented strict rate limiting. Analysis may take longer and downloads may fail.<br>
+                        <strong>Recommendation:</strong> If you get rate limit errors, wait 15-30 minutes before trying again.<br>
+                        <strong>Best Results:</strong> Use authenticated accounts with established login history.
+                    </small>
+                </div>
+                
+                <div id="resultsContainer" class="results-container mt-4" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">Analysis Results:</h6>
+                        <div class="result-controls">
+                            <button class="btn btn-outline-primary btn-sm" id="downloadPdf" style="display: none;">
+                                📄 Download PDF Report
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Profile Information -->
+                    <div id="profileInfo" class="mb-4"></div>
+                    
+                    <!-- Engagement Metrics -->
+                    <div id="engagementMetrics" class="mb-4"></div>
+                    
+                    <!-- Recent Posts -->
+                    <div id="recentPosts" class="mb-4"></div>
+                    
+                    <!-- Media Counts -->
+                    <div id="mediaCounts" class="mb-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allResults = {};
+let currentProfile = '';
+
+
+document.getElementById('instaloaderForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const profileName = document.getElementById('profileInput').value.trim();
+    const username = document.getElementById('usernameInput').value.trim();
+    const password = document.getElementById('passwordInput').value.trim();
+    
+    currentProfile = profileName;
+    const analyzeButton = document.getElementById('analyzeButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const alertContainer = document.getElementById('alertContainer');
+    const resultsContainer = document.getElementById('resultsContainer');
+    
+    // Show loading state
+    analyzeButton.disabled = true;
+    buttonText.textContent = 'Analyzing...';
+    loadingSpinner.style.display = 'inline-block';
+    alertContainer.innerHTML = '';
+    resultsContainer.style.display = 'none';
+    
+    try {
+        // Get investigation ID
+        const investigationSelect = document.getElementById('investigationSelect');
+        const investigationId = investigationSelect.value;
+        
+        if (!investigationId) {
+            throw new Error('Please select an investigation before starting the analysis');
+        }
+        
+        // Prepare search parameters
+        const searchParams = {
+            profile_name: profileName
+        };
+        
+        // Add authentication if provided
+        if (username && password) {
+            searchParams.username = username;
+            searchParams.password = password;
+        }
+        
+        // Queue the search task
+        const queueResponse = await fetch('/api/search/queue', getTorFetchOptions({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            },
+            body: JSON.stringify({ 
+                tool_name: 'instaloader',
+                query: profileName,
+                investigation_id: investigationId,
+                search_params: searchParams,
+                force_redo: document.getElementById('forceRedoCheck').checked
+            })
+        }));
+        
+        const queueData = await queueResponse.json();
+        
+        if (!queueResponse.ok) {
+            throw new Error(queueData.error || 'Failed to queue analysis');
+        }
+        
+        const searchId = queueData.search_id;
+        
+        // Poll for results
+        await pollForResults(searchId);
+        
+        // Clear password field for security
+        document.getElementById('passwordInput').value = '';
+        
+    } catch (error) {
+        alertContainer.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <strong>Error:</strong> ${error.message}
+            </div>
+        `;
+        
+        // Clear password field on error too
+        document.getElementById('passwordInput').value = '';
+    } finally {
+        // Reset button state
+        analyzeButton.disabled = false;
+        buttonText.textContent = 'Analyze Profile';
+        loadingSpinner.style.display = 'none';
+    }
+});
+
+async function pollForResults(searchId) {
+    const maxAttempts = 120; // 10 minutes maximum
+    let attempts = 0;
+    
+    const buttonText = document.getElementById('buttonText');
+    
+    // Create enhanced progress UI
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'mt-3 p-3 bg-light rounded';
+    progressContainer.innerHTML = `
+        <div class="d-flex align-items-center mb-2">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="fw-bold">Analyzing Instagram Profile...</span>
+        </div>
+        <div class="progress mb-2" style="height: 20px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                 role="progressbar" style="width: 5%"></div>
+        </div>
+        <div class="d-flex justify-content-between">
+            <small class="text-muted" id="progressStatus">Initializing search...</small>
+            <small class="text-muted" id="progressTime">Elapsed: 0s</small>
+        </div>
+        <div class="mt-2">
+            <small class="text-info">
+                <i class="bi bi-info-circle"></i>
+                Instagram searches may take 1-3 minutes due to rate limiting
+            </small>
+        </div>
+    `;
+    
+    const formCard = document.querySelector('#instaloaderForm').closest('.card-body');
+    formCard.appendChild(progressContainer);
+    
+    const progressBar = progressContainer.querySelector('.progress-bar');
+    const progressStatus = progressContainer.querySelector('#progressStatus');
+    const progressTime = progressContainer.querySelector('#progressTime');
+    
+    // Track elapsed time
+    const startTime = Date.now();
+    
+    while (attempts < maxAttempts) {
+        try {
+            const statusResponse = await fetch(`/api/search/${searchId}/status`);
+            const statusData = await statusResponse.json();
+            
+            // Update progress and elapsed time
+            const progress = statusData.progress || 0;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            
+            progressBar.style.width = `${Math.max(progress, 5)}%`;
+            progressTime.textContent = `Elapsed: ${timeStr}`;
+            
+            if (statusData.status === 'completed') {
+                // Update final progress
+                progressBar.style.width = '100%';
+                progressBar.className = 'progress-bar bg-success';
+                progressStatus.innerHTML = '<i class="bi bi-check-circle text-success"></i> Analysis completed successfully!';
+                
+                // Get results
+                const resultsResponse = await fetch(`/api/search/${searchId}/results`);
+                const resultsData = await resultsResponse.json();
+                
+                // Clean up progress bar after a short delay to show completion
+                setTimeout(() => {
+                    progressContainer.remove();
+                }, 2000);
+                
+                // Display results
+                displayResults(resultsData.results);
+                return;
+            } else if (statusData.status === 'failed') {
+                progressBar.className = 'progress-bar bg-danger';
+                progressStatus.innerHTML = '<i class="bi bi-exclamation-circle text-danger"></i> Analysis failed';
+                setTimeout(() => {
+                    progressContainer.remove();
+                }, 3000);
+                throw new Error(statusData.error_message || 'Analysis failed');
+            }
+            
+            // Update status text based on progress and time
+            if (statusData.status === 'running') {
+                if (progress > 0) {
+                    buttonText.textContent = `Analyzing... (${Math.round(progress)}%)`;
+                    progressStatus.innerHTML = `<i class="bi bi-gear-fill text-primary"></i> Analyzing profile data... ${Math.round(progress)}%`;
+                } else {
+                    buttonText.textContent = 'Analyzing...';
+                    if (elapsed < 30) {
+                        progressStatus.innerHTML = '<i class="bi bi-hourglass-split text-primary"></i> Connecting to Instagram...';
+                    } else if (elapsed < 60) {
+                        progressStatus.innerHTML = '<i class="bi bi-search text-primary"></i> Fetching profile information...';
+                    } else {
+                        progressStatus.innerHTML = '<i class="bi bi-clock text-warning"></i> Processing large profile (this may take longer)...';
+                    }
+                }
+            } else {
+                buttonText.textContent = 'Processing...';
+                progressStatus.innerHTML = '<i class="bi bi-hourglass-split text-info"></i> Initializing search...';
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            attempts++;
+            
+        } catch (error) {
+            progressContainer.remove();
+            throw error;
+        }
+    }
+    
+    progressContainer.remove();
+    throw new Error('Analysis timed out. Please try again.');
+}
+
+function displayResults(results) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    const profileInfo = document.getElementById('profileInfo');
+    const engagementMetrics = document.getElementById('engagementMetrics');
+    const recentPosts = document.getElementById('recentPosts');
+    const mediaCounts = document.getElementById('mediaCounts');
+    const downloadPdf = document.getElementById('downloadPdf');
+    
+    // Store results globally
+    allResults = results;
+    
+    if (!results || !results.profile) {
+        profileInfo.innerHTML = '<p class="text-muted">No profile data available.</p>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+    
+    // Show download button
+    downloadPdf.style.display = 'inline-block';
+    
+    // Display profile information
+    const profile = results.profile;
+    profileInfo.innerHTML = `
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Profile Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Username:</strong> @${profile.username}</p>
+                        <p><strong>Full Name:</strong> ${profile.full_name || 'Not available'}</p>
+                        <p><strong>Biography:</strong> ${profile.biography || 'No bio'}</p>
+                        <p><strong>External URL:</strong> ${profile.external_url ? `<a href="${profile.external_url}" target="_blank">${profile.external_url}</a>` : 'None'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Followers:</strong> ${profile.followers.toLocaleString()}</p>
+                        <p><strong>Following:</strong> ${profile.followees.toLocaleString()}</p>
+                        <p><strong>Posts:</strong> ${profile.mediacount.toLocaleString()}</p>
+                        <p><strong>Account Type:</strong> 
+                            ${profile.is_verified ? '✅ Verified' : ''}
+                            ${profile.is_private ? '🔒 Private' : '🌐 Public'}
+                            ${profile.is_business_account ? '🏢 Business' : '👤 Personal'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Display engagement metrics
+    const engagement = results.engagement;
+    if (engagement) {
+        engagementMetrics.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Engagement Metrics</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <h5 class="text-primary">${engagement.average_likes}</h5>
+                                <p class="text-muted">Avg Likes</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <h5 class="text-success">${engagement.average_comments}</h5>
+                                <p class="text-muted">Avg Comments</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <h5 class="text-info">${engagement.engagement_rate}%</h5>
+                                <p class="text-muted">Engagement Rate</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <h5 class="text-warning">${engagement.post_frequency}</h5>
+                                <p class="text-muted">Post Frequency</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Display recent posts
+    const posts = results.recent_posts;
+    if (posts && posts.length > 0) {
+        const postsHtml = posts.map(post => `
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <p class="mb-1"><strong>${post.likes.toLocaleString()}</strong> likes, <strong>${post.comments.toLocaleString()}</strong> comments</p>
+                            <p class="text-muted mb-1">${new Date(post.date).toLocaleDateString()}</p>
+                            ${post.caption ? `<p class="mb-1">${post.caption.substring(0, 100)}${post.caption.length > 100 ? '...' : ''}</p>` : ''}
+                            ${post.hashtags && post.hashtags.length > 0 ? `<p class="mb-0"><small class="text-info">#${post.hashtags.slice(0, 5).join(' #')}</small></p>` : ''}
+                        </div>
+                        <div class="ms-3">
+                            <a href="${post.url}" target="_blank" class="btn btn-sm btn-outline-primary">View Post</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        recentPosts.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Recent Posts (${posts.length} analyzed)</h6>
+                </div>
+                <div class="card-body">
+                    ${postsHtml}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Display authentication status
+    const authStatus = results.auth_status;
+    if (authStatus) {
+        displayAuthStatus(authStatus);
+    }
+    
+    // Display media counts
+    const mediaCountsData = results.media_counts;
+    if (mediaCountsData) {
+        mediaCounts.innerHTML = `
+            <div class="card border-success">
+                <div class="card-header bg-success bg-opacity-10">
+                    <h6 class="mb-0">📊 Available Media for Download</h6>
+                    <small class="text-muted">Estimated counts based on profile analysis</small>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="metric-card bg-primary bg-opacity-10">
+                                <h5 class="text-primary">📸 ${mediaCountsData.images.toLocaleString()}</h5>
+                                <p class="text-muted mb-0">Images</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card bg-success bg-opacity-10">
+                                <h5 class="text-success">🎥 ${mediaCountsData.videos.toLocaleString()}</h5>
+                                <p class="text-muted mb-0">Videos</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card bg-info bg-opacity-10">
+                                <h5 class="text-info">📖 ${mediaCountsData.stories}</h5>
+                                <p class="text-muted mb-0">Stories</p>
+                                <small class="text-muted">(Auth required)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card bg-warning bg-opacity-10">
+                                <h5 class="text-warning">⭐ ${mediaCountsData.highlights}</h5>
+                                <p class="text-muted mb-0">Highlights</p>
+                                <small class="text-muted">(Auth required)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="metric-card bg-secondary bg-opacity-10">
+                                <h5 class="text-secondary">📱 ${mediaCountsData.carousel_posts.toLocaleString()}</h5>
+                                <p class="text-muted mb-0">Carousel Posts</p>
+                                <small class="text-muted">Multi-image posts</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="metric-card bg-dark bg-opacity-10">
+                                <h5 class="text-dark">📦 ${mediaCountsData.total_posts.toLocaleString()}</h5>
+                                <p class="text-muted mb-0">Total Posts</p>
+                                <small class="text-muted">All post types</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="alert alert-info mb-0">
+                            <small>
+                                <strong>Note:</strong> Counts are estimates based on ${results.posts_analyzed} analyzed posts. 
+                                Stories and highlights require authentication. Download limits apply for safety.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    resultsContainer.style.display = 'block';
+}
+
+function displayAuthStatus(authStatus) {
+    const authStatusIndicator = document.getElementById('authStatusIndicator');
+    const authStatusAlert = document.getElementById('authStatusAlert');
+    const authStatusText = document.getElementById('authStatusText');
+    
+    if (authStatus.attempted_login) {
+        authStatusIndicator.style.display = 'block';
+        
+        let statusText = '';
+        let alertClass = 'alert-info';
+        
+        if (authStatus.login_successful) {
+            if (authStatus.login_method === 'session') {
+                statusText = `✅ Authenticated as @${authStatus.username} (using saved session)`;
+                alertClass = 'alert-success';
+            } else if (authStatus.login_method === 'credentials') {
+                statusText = `✅ Successfully logged in as @${authStatus.username}`;
+                alertClass = 'alert-success';
+            }
+        } else {
+            statusText = `❌ Login failed for @${authStatus.username}. Analyzing as public profile.`;
+            alertClass = 'alert-warning';
+        }
+        
+        authStatusAlert.className = `alert mb-0 ${alertClass}`;
+        authStatusText.textContent = statusText;
+    } else {
+        authStatusIndicator.style.display = 'none';
+    }
+}
+
+// Add event listener for PDF download
+document.getElementById('downloadPdf').addEventListener('click', function() {
+    generatePDF();
+});
+
+function generatePDF() {
+    if (!allResults || !allResults.profile) return;
+    
+    // Create PDF data
+    const pdfData = {
+        profile_name: currentProfile,
+        timestamp: new Date().toISOString(),
+        results: allResults
+    };
+    
+    // Send to server for PDF generation
+    fetch('/api/instaloader/generate-pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pdfData)
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `instagram-analysis-${currentProfile}-${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    })
+    .catch(error => {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    });
+}
+
+// New Search button functionality
+document.getElementById('newSearchButton').addEventListener('click', function() {
+    // Clear the profile input
+    document.getElementById('profileInput').value = '';
+    
+    // Keep investigation and Tor settings, but reset other elements
+    document.getElementById('forceRedoCheck').checked = false;
+    
+    // Clear authentication fields for security
+    document.getElementById('usernameInput').value = '';
+    document.getElementById('passwordInput').value = '';
+    
+    // Clear results and alerts
+    document.getElementById('alertContainer').innerHTML = '';
+    document.getElementById('resultsContainer').style.display = 'none';
+    document.getElementById('authStatusIndicator').style.display = 'none';
+    
+    // Reset button state
+    const analyzeButton = document.getElementById('analyzeButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    analyzeButton.disabled = false;
+    buttonText.textContent = 'Analyze Profile';
+    loadingSpinner.style.display = 'none';
+    
+    // Focus on profile input
+    document.getElementById('profileInput').focus();
+});
+
+</script>
+{% endblock %}

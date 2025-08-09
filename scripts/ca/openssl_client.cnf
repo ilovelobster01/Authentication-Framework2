@@ -1,0 +1,19 @@
+[ req ]
+default_bits        = 4096
+distinguished_name  = req_distinguished_name
+req_extensions      = req_ext
+prompt              = no
+
+authenticator       = client
+
+[ req_distinguished_name ]
+C = US
+ST = CA
+L = Local Francisco
+O = DevOrg
+OU = DevClient
+CN = client
+
+[ req_ext ]
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth

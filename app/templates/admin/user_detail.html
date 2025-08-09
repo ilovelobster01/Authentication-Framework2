@@ -1,0 +1,62 @@
+{% extends 'layout.html' %}
+{% block title %}User {{ user.username }}{% endblock %}
+{% block content %}
+<h1>User: {{ user.username }}</h1>
+<p>Email: {{ user.email }} | Admin: {{ 'Yes' if user.is_admin else 'No' }} | Active: {{ 'Yes' if user.is_active else 'No' }}</p>
+<h2>Actions</h2>
+<form class="inline" action="{{ url_for('admin.reset_password') }}" method="post">
+  {{ reset_form.hidden_tag() }}
+  {{ reset_form.password(size=24) }}
+  {{ reset_form.submit() }}
+</form>
+<form class="inline" action="{{ url_for('admin.toggle_active') }}" method="post">
+  {{ toggle_form.hidden_tag() }}
+  {{ toggle_form.submit() }}
+</form>
+<form class="inline" action="{{ url_for('admin.reset_totp') }}" method="post">
+  {{ totp_form.hidden_tag() }}
+  {{ totp_form.submit() }}
+</form>
+
+<h2>Certificates</h2>
+{% if current_fpr %}
+  <div class="current-cert">
+    <strong>Presented certificate (not yet bound):</strong>
+    <ul>
+      <li>Fingerprint (SHA-256): <code>{{ current_fpr }}</code></li>
+      <li>Serial: {{ current_meta.serial }}</li>
+      <li>Subject: {{ current_meta.subject }}</li>
+      <li>Issuer: {{ current_meta.issuer }}</li>
+      <li>Valid: {{ current_meta.not_before }} - {{ current_meta.not_after }}</li>
+    </ul>
+  </div>
+{% else %}
+  <p><em>No client certificate presented (or not verified).</em></p>
+{% endif %}
+<form class="inline" action="{{ url_for('admin.bind_current_cert') }}" method="post">
+  {{ bind_form.hidden_tag() }}
+  {{ bind_form.submit() }}
+</form>
+<table>
+  <tr><th>Fingerprint (SHA-256)</th><th>Serial</th><th>Issuer</th><th>Valid</th><th>Status</th><th>Action</th></tr>
+  {% for cert, f in cert_forms %}
+  <tr>
+    <td>{{ cert.fingerprint_sha256 }}</td>
+    <td>{{ cert.serial_number }}</td>
+    <td>{{ cert.issuer }}</td>
+    <td>
+      {% if cert.not_before %}{{ cert.not_before }}{% endif %} - {% if cert.not_after %}{{ cert.not_after }}{% endif %}
+    </td>
+    <td>{{ 'Revoked' if cert.is_revoked else 'Active' }}</td>
+    <td>
+      {% if not cert.is_revoked %}
+        <form class="inline" action="{{ url_for('admin.revoke_cert') }}" method="post">
+          {{ f.hidden_tag() }}
+          {{ f.submit() }}
+        </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

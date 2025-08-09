@@ -1,0 +1,232 @@
+{% extends "base_new.html" %}
+
+{% block title %}Download Quota for {{ user.username }} - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-download"></i> Download Quota Settings for {{ user.username }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- User Info -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-person"></i> User Information
+                        </h6>
+                        <p><strong>Username:</strong> {{ user.username }}</p>
+                        <p><strong>Email:</strong> {{ user.email }}</p>
+                        <p><strong>Role:</strong> 
+                            {% for role in user.roles %}
+                                <span class="badge bg-primary">{{ role.name }}</span>
+                            {% endfor %}
+                        </p>
+                        <p><strong>Status:</strong> 
+                            {% if user.active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-bar-chart"></i> Download Statistics
+                        </h6>
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h4 class="text-primary">{{ download_stats.total_downloads }}</h4>
+                                <p class="text-muted small mb-2">Total Downloads</p>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-success">{{ download_stats.downloads_today }}</h4>
+                                <p class="text-muted small mb-2">Today</p>
+                            </div>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h4 class="text-warning">{{ download_stats.active_downloads }}</h4>
+                                <p class="text-muted small mb-2">Active</p>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-info">{{ "%.1f"|format(download_stats.total_size / 1024 / 1024) }} MB</h4>
+                                <p class="text-muted small mb-2">Total Size</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Quota Form -->
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <h6 class="text-primary mb-3">
+                        <i class="bi bi-gear"></i> Quota Settings
+                    </h6>
+                    
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="max_daily_downloads" class="form-label">Daily Downloads</label>
+                                {{ form.max_daily_downloads(class="form-control") }}
+                                {% if form.max_daily_downloads.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.max_daily_downloads.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Maximum downloads per day</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="max_storage_mb" class="form-label">Storage (MB)</label>
+                                {{ form.max_storage_mb(class="form-control") }}
+                                {% if form.max_storage_mb.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.max_storage_mb.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Maximum storage space</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="max_retention_days" class="form-label">Retention (Days)</label>
+                                {{ form.max_retention_days(class="form-control") }}
+                                {% if form.max_retention_days.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.max_retention_days.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">How long to keep files</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="max_file_size_mb" class="form-label">Max File Size (MB)</label>
+                                {{ form.max_file_size_mb(class="form-control") }}
+                                {% if form.max_file_size_mb.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.max_file_size_mb.errors %}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Maximum size per file</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quota Presets -->
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Quick Presets:</strong>
+                        <div class="d-flex gap-2 flex-wrap mt-2">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="setQuotaPreset('basic')">
+                                Basic (3/256MB/3d/100MB)
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="setQuotaPreset('standard')">
+                                Standard (10/1GB/7d/500MB)
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="setQuotaPreset('analyst')">
+                                Analyst (50/5GB/14d/1GB)
+                            </button>
+                            <button type="button" class="btn btn-outline-success btn-sm" onclick="setQuotaPreset('admin')">
+                                Admin (1000/10GB/30d/2GB)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to User
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Update Quota
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Current Quota Overview -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-speedometer2"></i> Current Quota Status</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="progress mb-2">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {{ (download_stats.downloads_today / quota.max_daily_downloads * 100) if quota.max_daily_downloads > 0 else 0 }}%">
+                            </div>
+                        </div>
+                        <p class="small text-muted">Daily Downloads: {{ download_stats.downloads_today }}/{{ quota.max_daily_downloads }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-info" role="progressbar" 
+                                 style="width: {{ (download_stats.total_size / 1024 / 1024 / quota.max_storage_mb * 100) if quota.max_storage_mb > 0 else 0 }}%">
+                            </div>
+                        </div>
+                        <p class="small text-muted">Storage: {{ "%.1f"|format(download_stats.total_size / 1024 / 1024) }}/{{ quota.max_storage_mb }}MB</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Set quota presets
+function setQuotaPreset(preset) {
+    if (preset === 'basic') {
+        document.getElementById('max_daily_downloads').value = 3;
+        document.getElementById('max_storage_mb').value = 256;
+        document.getElementById('max_retention_days').value = 3;
+        document.getElementById('max_file_size_mb').value = 100;
+    } else if (preset === 'standard') {
+        document.getElementById('max_daily_downloads').value = 10;
+        document.getElementById('max_storage_mb').value = 1024;
+        document.getElementById('max_retention_days').value = 7;
+        document.getElementById('max_file_size_mb').value = 500;
+    } else if (preset === 'analyst') {
+        document.getElementById('max_daily_downloads').value = 50;
+        document.getElementById('max_storage_mb').value = 5120;
+        document.getElementById('max_retention_days').value = 14;
+        document.getElementById('max_file_size_mb').value = 1024;
+    } else if (preset === 'admin') {
+        document.getElementById('max_daily_downloads').value = 1000;
+        document.getElementById('max_storage_mb').value = 10240;
+        document.getElementById('max_retention_days').value = 30;
+        document.getElementById('max_file_size_mb').value = 2048;
+    }
+    
+    // Show visual feedback
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <i class="bi bi-download"></i> Applied ${preset} quota preset
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}

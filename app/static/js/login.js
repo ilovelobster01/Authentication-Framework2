@@ -1,0 +1,39 @@
+(function(){
+  function qs(id){ return document.getElementById(id); }
+  async function doLogin(){
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ username: qs('username').value, password: qs('password').value })
+    });
+    let data;
+    try { data = await res.json(); } catch (e) { const t = await res.text(); alert(t || 'Login failed'); return; }
+    if (data.status === '2fa_required') {
+      qs('totp-form').classList.remove('hidden');
+    } else if (data.status === 'ok') {
+      window.location = '/admin/';
+    } else {
+      alert((data && data.message) || 'Login failed');
+    }
+  }
+  async function doVerifyTotp(){
+    const res = await fetch('/2fa/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ code: qs('totp').value })
+    });
+    let data;
+    try { data = await res.json(); } catch (e) { const t = await res.text(); alert(t || 'Invalid code'); return; }
+    if (data.status === 'ok') {
+      window.location = '/admin/';
+    } else {
+      alert('Invalid code');
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    const bl = qs('btn-login');
+    const bv = qs('btn-verify-totp');
+    if (bl) bl.addEventListener('click', doLogin);
+    if (bv) bv.addEventListener('click', doVerifyTotp);
+  });
+})();

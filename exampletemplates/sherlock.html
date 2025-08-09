@@ -1,0 +1,400 @@
+{% extends "base_new.html" %}
+
+{% block title %}Sherlock - Username Investigation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-2">🔍 Sherlock Username Investigation</h1>
+                <p class="text-muted mb-0">Hunt down social media accounts by username across 400+ social networks</p>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-success fs-6">🟢 Active</span>
+                <br>
+                <small class="text-muted">sherlock v1.0.0</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Username Investigation</h5>
+            </div>
+            <div class="card-body">
+                <!-- Tor Status -->
+                {% include 'components/tor_status_compact.html' %}
+                
+                <form id="sherlockForm">
+                    <!-- Investigation Selection -->
+                    <div class="mb-3">
+                        <label for="investigationSelect" class="form-label">Link to Investigation</label>
+                        <div class="input-group">
+                            <select class="form-select" id="investigationSelect" name="investigation_id" required>
+                                <option value="">Select an investigation</option>
+                                {% for investigation in investigations %}
+                                <option value="{{ investigation.id }}">
+                                    {{ investigation.name }}
+                                    {% if investigation.case_number %} - {{ investigation.case_number }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <a href="{{ url_for('investigations.create') }}" class="btn btn-outline-secondary" title="Create New Investigation">
+                                <i class="bi bi-plus-circle"></i>
+                            </a>
+                        </div>
+                        <div class="form-text">This search will be linked to the selected investigation</div>
+                    </div>
+                    
+                    <div class="username-input-group mb-3">
+                        <label for="usernameInput" class="form-label">Username</label>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="usernameInput" 
+                                   placeholder="Enter username to investigate"
+                                   pattern="[a-zA-Z0-9._\-]+"
+                                   title="Username can contain letters, numbers, dots, underscores, and hyphens"
+                                   required>
+                            <button class="btn btn-primary" type="submit" id="searchButton">
+                                <span id="buttonText">Search Username</span>
+                                <span id="loadingSpinner" class="spinner-border spinner-border-sm loading-spinner" role="status"></span>
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" id="newSearchButton">
+                                <i class="bi bi-plus-circle"></i> New Search
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">Valid characters: letters, numbers, dots (.), underscores (_), hyphens (-)</small>
+                    </div>
+                    
+                    <!-- Search Options -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="forceRedoCheck">
+                                <label class="form-check-label" for="forceRedoCheck">
+                                    <small>Force redo (ignore duplicate detection)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <div id="alertContainer"></div>
+                
+                <div id="resultsContainer" class="results-container mt-4" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">Investigation Results:</h6>
+                        <div class="result-controls">
+                            <button class="btn btn-outline-primary btn-sm" id="downloadPdf" style="display: none;">
+                                📄 Download PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div id="resultsList"></div>
+                    <div id="summaryStats" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h6>About Sherlock</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>What it does:</strong> Sherlock searches for usernames across 400+ social networks and platforms.</p>
+                <p class="mb-2"><strong>How it works:</strong> Checks for username existence by analyzing HTTP responses from social media platforms.</p>
+                <p class="mb-2"><strong>Results:</strong> Shows only found accounts to keep results focused and actionable.</p>
+                <p class="mb-0"><strong>Use case:</strong> OSINT investigations, social media enumeration, and digital footprint analysis.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allResults = [];
+let currentUsername = '';
+
+document.getElementById('sherlockForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('usernameInput').value;
+    currentUsername = username;
+    const searchButton = document.getElementById('searchButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const alertContainer = document.getElementById('alertContainer');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsList = document.getElementById('resultsList');
+    const summaryStats = document.getElementById('summaryStats');
+    
+    // Show loading state
+    searchButton.disabled = true;
+    buttonText.textContent = 'Searching...';
+    loadingSpinner.style.display = 'inline-block';
+    alertContainer.innerHTML = '';
+    resultsContainer.style.display = 'none';
+    
+    try {
+        // Get investigation ID
+        const investigationSelect = document.getElementById('investigationSelect');
+        const investigationId = investigationSelect.value;
+        
+        if (!investigationId) {
+            throw new Error('Please select an investigation before starting the search');
+        }
+        
+        // Queue the search task
+        const queueResponse = await fetch('/api/search/queue', getTorFetchOptions({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            },
+            body: JSON.stringify({ 
+                tool_name: 'sherlock',
+                query: username,
+                investigation_id: investigationId,
+                force_redo: document.getElementById('forceRedoCheck').checked
+            })
+        }));
+        
+        const queueData = await queueResponse.json();
+        
+        if (!queueResponse.ok) {
+            throw new Error(queueData.error || 'Failed to queue search');
+        }
+        
+        const searchId = queueData.search_id;
+        
+        // Poll for results
+        await pollForResults(searchId);
+        
+    } catch (error) {
+        alertContainer.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <strong>Error:</strong> ${error.message}
+            </div>
+        `;
+    } finally {
+        // Reset button state
+        searchButton.disabled = false;
+        buttonText.textContent = 'Search Username';
+        loadingSpinner.style.display = 'none';
+    }
+});
+
+async function pollForResults(searchId) {
+    const maxAttempts = 120; // 10 minutes maximum
+    let attempts = 0;
+    
+    const buttonText = document.getElementById('buttonText');
+    const progressBar = document.createElement('div');
+    progressBar.className = 'progress mt-2';
+    progressBar.innerHTML = '<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>';
+    
+    const formCard = document.querySelector('#sherlockForm').closest('.card-body');
+    formCard.appendChild(progressBar);
+    
+    while (attempts < maxAttempts) {
+        try {
+            const statusResponse = await fetch(`/api/search/${searchId}/status`);
+            const statusData = await statusResponse.json();
+            
+            // Update progress
+            const progress = statusData.progress || 0;
+            progressBar.querySelector('.progress-bar').style.width = `${progress}%`;
+            
+            if (statusData.status === 'completed') {
+                // Get results
+                const resultsResponse = await fetch(`/api/search/${searchId}/results`);
+                const resultsData = await resultsResponse.json();
+                
+                // Clean up progress bar
+                progressBar.remove();
+                
+                // Display results
+                displayResults(resultsData.results);
+                return;
+            } else if (statusData.status === 'failed') {
+                progressBar.remove();
+                throw new Error(statusData.error_message || 'Search failed');
+            }
+            
+            // Update status text
+            if (statusData.status === 'running') {
+                buttonText.textContent = `Searching... (${progress}%)`;
+            } else {
+                buttonText.textContent = 'Processing...';
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            attempts++;
+            
+        } catch (error) {
+            progressBar.remove();
+            throw error;
+        }
+    }
+    
+    progressBar.remove();
+    throw new Error('Search timed out. Please try again.');
+}
+
+function displayResults(results) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsList = document.getElementById('resultsList');
+    const summaryStats = document.getElementById('summaryStats');
+    const downloadPdf = document.getElementById('downloadPdf');
+    
+    // Store results globally
+    allResults = results;
+    
+    if (!results || results.length === 0) {
+        resultsList.innerHTML = '<p class="text-muted">No accounts found for this username.</p>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+    
+    // Show download button
+    downloadPdf.style.display = 'inline-block';
+    
+    // Generate results HTML (only found accounts)
+    const resultsHtml = results.map(result => {
+        // Extract platform name from URL if platform field is missing or empty
+        let platformName = result.platform || result.site;
+        if (!platformName || platformName === 'unknown' || platformName === 'Unknown') {
+            // Extract domain from URL as fallback
+            try {
+                const url = new URL(result.url);
+                platformName = url.hostname.replace('www.', '').split('.')[0];
+                // Capitalize first letter
+                platformName = platformName.charAt(0).toUpperCase() + platformName.slice(1);
+            } catch (e) {
+                platformName = 'Unknown Platform';
+            }
+        }
+        
+        return `
+            <div class="result-item exists">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${platformName}</strong>
+                        <span class="badge bg-success ms-2">
+                            ✅ Found
+                        </span>
+                    </div>
+                    <div>
+                        <a href="${result.url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            🔗 View Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    resultsList.innerHTML = resultsHtml;
+    
+    // Generate summary statistics
+    const foundAccounts = results.length;
+    
+    summaryStats.innerHTML = `
+        <div class="row text-center">
+            <div class="col-md-6 offset-md-3">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">${foundAccounts}</h5>
+                        <p class="card-text">Social Media Accounts Found</p>
+                        <small class="text-muted">Across 400+ platforms searched</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    resultsContainer.style.display = 'block';
+}
+
+// Add event listener for PDF download
+document.getElementById('downloadPdf').addEventListener('click', function() {
+    generatePDF();
+});
+
+// New Search button functionality
+document.getElementById('newSearchButton').addEventListener('click', function() {
+    // Clear the username input
+    document.getElementById('usernameInput').value = '';
+    
+    // Keep investigation and Tor settings, but reset other elements
+    document.getElementById('forceRedoCheck').checked = false;
+    
+    // Clear results and alerts
+    document.getElementById('alertContainer').innerHTML = '';
+    document.getElementById('resultsContainer').style.display = 'none';
+    
+    // Reset button state
+    const searchButton = document.getElementById('searchButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    searchButton.disabled = false;
+    buttonText.textContent = 'Search Username';
+    loadingSpinner.style.display = 'none';
+    
+    // Focus on username input
+    document.getElementById('usernameInput').focus();
+});
+
+function generatePDF() {
+    if (allResults.length === 0) return;
+    
+    // Create PDF data
+    const pdfData = {
+        username: currentUsername,
+        timestamp: new Date().toISOString(),
+        results: allResults,
+        summary: {
+            total: allResults.length,
+            found: allResults.length,
+            displayed: allResults.length
+        }
+    };
+    
+    // Send to server for PDF generation
+    fetch('/api/sherlock/generate-pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pdfData)
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `sherlock-results-${currentUsername}-${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    })
+    .catch(error => {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base_new.html" %}
+
+{% block title %}Debug Context{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Debug Context Variables</h2>
+    
+    <div class="card">
+        <div class="card-header">Available Modules Debug</div>
+        <div class="card-body">
+            <p><strong>available_modules length:</strong> {{ available_modules|length if available_modules else 'None' }}</p>
+            <p><strong>current_user authenticated:</strong> {{ current_user.is_authenticated if current_user else 'No current_user' }}</p>
+            <p><strong>current_user admin:</strong> {{ current_user.is_admin if current_user else 'No current_user' }}</p>
+            
+            {% if available_modules %}
+            <h5>Available Modules:</h5>
+            <ul>
+                {% for module in available_modules %}
+                <li>{{ module.name }}: {{ module.display_name }} ({{ module.status.value }})</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-warning">No available_modules found in context</p>
+            {% endif %}
+            
+            <h5>Template Context Variables:</h5>
+            <ul>
+                <li>app_name: {{ app_name }}</li>
+                <li>app_version: {{ app_version }}</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

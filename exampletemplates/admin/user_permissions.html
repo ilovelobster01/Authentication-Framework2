@@ -1,0 +1,383 @@
+{% extends "base_new.html" %}
+
+{% block title %}{{ user.username }} Permissions - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h3><i class="bi bi-gear"></i> User Permissions</h3>
+                <p class="text-muted mb-0">Managing permissions for: <strong>{{ user.username }}</strong> ({{ user.email }})</p>
+            </div>
+            <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to User
+            </a>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <!-- Permissions Form -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-shield-check"></i> Tool and System Permissions</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            {{ form.hidden_tag() }}
+                            
+                            <!-- OSINT Tool Permissions -->
+                            <div class="mb-4">
+                                <h6 class="text-primary mb-3">
+                                    <i class="bi bi-tools"></i> OSINT Tool Access
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card border-0 bg-light">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.holehe(class="form-check-input") }}
+                                                    <label class="form-check-label" for="holehe">
+                                                        <strong>Holehe</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    Email OSINT tool for checking if an email is registered on different websites
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card border-0 bg-light">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.sherlock(class="form-check-input") }}
+                                                    <label class="form-check-label" for="sherlock">
+                                                        <strong>Sherlock</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    Username OSINT tool for finding usernames across social networks
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <div class="card border-0 bg-light">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.instaloader(class="form-check-input") }}
+                                                    <label class="form-check-label" for="instaloader">
+                                                        <strong>Instaloader</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    Instagram OSINT tool for downloading and analyzing Instagram content
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card border-0 bg-light">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.telegram(class="form-check-input") }}
+                                                    <label class="form-check-label" for="telegram">
+                                                        <strong>Telegram OSINT</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    Telegram OSINT tool for gathering information from Telegram
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr>
+
+                            <!-- Administrative Permissions -->
+                            <div class="mb-4">
+                                <h6 class="text-warning mb-3">
+                                    <i class="bi bi-shield-exclamation"></i> Administrative Access
+                                </h6>
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <strong>Warning:</strong> Administrative permissions grant significant system access. Only assign to trusted users.
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card border-warning">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.admin_access(class="form-check-input") }}
+                                                    <label class="form-check-label" for="admin_access">
+                                                        <strong>Admin Panel Access</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    Full access to admin panel and all administrative functions
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card border-info">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.user_management(class="form-check-input") }}
+                                                    <label class="form-check-label" for="user_management">
+                                                        <strong>User Management</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    Create, edit, and delete user accounts
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <div class="card border-info">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.system_config(class="form-check-input") }}
+                                                    <label class="form-check-label" for="system_config">
+                                                        <strong>System Configuration</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    Modify system settings and configuration
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card border-info">
+                                            <div class="card-body">
+                                                <div class="form-check form-switch">
+                                                    {{ form.audit_logs(class="form-check-input") }}
+                                                    <label class="form-check-label" for="audit_logs">
+                                                        <strong>Audit Logs Access</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">
+                                                    View system audit logs and user activity
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr>
+
+                            <div class="d-flex justify-content-between">
+                                <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="btn btn-secondary">
+                                    <i class="bi bi-x-lg"></i> Cancel
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg"></i> Update Permissions
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <!-- Current Status -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-person-badge"></i> Current Status</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Account Status:</strong>
+                            {% if user.active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Current Role:</strong>
+                            {% for role in user.roles %}
+                                <span class="badge bg-secondary">{{ role.name.title() }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Email Confirmed:</strong>
+                            {% if user.confirmed_at %}
+                                <span class="text-success"><i class="bi bi-check-circle"></i> Yes</span>
+                            {% else %}
+                                <span class="text-warning"><i class="bi bi-exclamation-circle"></i> No</span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <strong>Last Login:</strong>
+                            {% if user.last_login_at %}
+                                <small>{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            {% else %}
+                                <small class="text-muted">Never</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permission Templates -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-layers"></i> Quick Templates</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted">Apply common permission sets:</p>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-success btn-sm" onclick="applyTemplate('guest')">
+                                <i class="bi bi-eye"></i> Guest Access
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="applyTemplate('user')">
+                                <i class="bi bi-person"></i> Standard User
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="applyTemplate('admin')">
+                                <i class="bi bi-shield-check"></i> Administrator
+                            </button>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="small">
+                            <div class="mb-2">
+                                <strong>Guest:</strong> Holehe only
+                            </div>
+                            <div class="mb-2">
+                                <strong>User:</strong> Holehe, Sherlock, Telegram
+                            </div>
+                            <div>
+                                <strong>Admin:</strong> All tools + admin access
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-activity"></i> Activity Summary</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center">
+                            <div class="row">
+                                <div class="col-6">
+                                    <h5 class="text-primary">{{ user.investigations.count() }}</h5>
+                                    <small class="text-muted">Investigations</small>
+                                </div>
+                                <div class="col-6">
+                                    <h5 class="text-success">{{ user.searches.count() }}</h5>
+                                    <small class="text-muted">Searches</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Permission templates
+function applyTemplate(template) {
+    // Reset all checkboxes
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    
+    if (template === 'guest') {
+        document.getElementById('holehe').checked = true;
+    } else if (template === 'user') {
+        document.getElementById('holehe').checked = true;
+        document.getElementById('sherlock').checked = true;
+        document.getElementById('telegram').checked = true;
+    } else if (template === 'admin') {
+        document.getElementById('holehe').checked = true;
+        document.getElementById('sherlock').checked = true;
+        document.getElementById('instaloader').checked = true;
+        document.getElementById('telegram').checked = true;
+        document.getElementById('admin_access').checked = true;
+        document.getElementById('user_management').checked = true;
+        document.getElementById('system_config').checked = true;
+        document.getElementById('audit_logs').checked = true;
+    }
+    
+    // Show confirmation
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-info alert-dismissible fade show position-fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <i class="bi bi-check-circle"></i> Applied ${template} template
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
+
+// Admin access warning
+document.getElementById('admin_access').addEventListener('change', function() {
+    if (this.checked) {
+        // Auto-check all admin permissions
+        document.getElementById('user_management').checked = true;
+        document.getElementById('system_config').checked = true;
+        document.getElementById('audit_logs').checked = true;
+        
+        // Show warning
+        if (!document.getElementById('admin-warning')) {
+            const warning = document.createElement('div');
+            warning.id = 'admin-warning';
+            warning.className = 'alert alert-danger mt-3';
+            warning.innerHTML = '<i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This user will have full administrative access to the system.';
+            this.closest('.card-body').appendChild(warning);
+        }
+    } else {
+        // Remove warning
+        const warning = document.getElementById('admin-warning');
+        if (warning) {
+            warning.remove();
+        }
+    }
+});
+
+// Validate form before submission
+document.querySelector('form').addEventListener('submit', function(e) {
+    const hasAnyPermission = document.querySelector('input[type="checkbox"]:checked');
+    if (!hasAnyPermission) {
+        e.preventDefault();
+        alert('Please select at least one permission for the user.');
+        return false;
+    }
+    
+    const hasAdminAccess = document.getElementById('admin_access').checked;
+    if (hasAdminAccess) {
+        if (!confirm('Are you sure you want to grant full administrative access to this user?')) {
+            e.preventDefault();
+            return false;
+        }
+    }
+});
+</script>
+{% endblock %}

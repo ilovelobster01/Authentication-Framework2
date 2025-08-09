@@ -1,0 +1,476 @@
+{% extends "base_new.html" %}
+
+{% block title %}Create Role - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-plus-circle"></i> Create New Role
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-info-circle"></i> Role Information
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Role Name <span class="text-danger">*</span></label>
+                                    {{ form.name(class="form-control") }}
+                                    {% if form.name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.name.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Choose a unique, descriptive name for this role</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description</label>
+                                    {{ form.description(class="form-control") }}
+                                    {% if form.description.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.description.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Brief description of this role's purpose</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Tool Permissions -->
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-tools"></i> Tool Permissions
+                        </h6>
+                        <p class="text-muted mb-3">Select which OSINT tools users with this role can access:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.holehe(class="form-check-input") }}
+                                            <label class="form-check-label" for="holehe">
+                                                <strong>Holehe</strong>
+                                                <span class="badge bg-success ms-2">Basic</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Email OSINT tool for checking if an email is registered on different websites
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.sherlock(class="form-check-input") }}
+                                            <label class="form-check-label" for="sherlock">
+                                                <strong>Sherlock</strong>
+                                                <span class="badge bg-primary ms-2">Standard</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Username OSINT tool for finding usernames across social networks
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.instaloader(class="form-check-input") }}
+                                            <label class="form-check-label" for="instaloader">
+                                                <strong>Instaloader</strong>
+                                                <span class="badge bg-warning ms-2">Advanced</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Instagram OSINT tool for downloading and analyzing Instagram content
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.telegram(class="form-check-input") }}
+                                            <label class="form-check-label" for="telegram">
+                                                <strong>Telegram OSINT</strong>
+                                                <span class="badge bg-info ms-2">Standard</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Telegram OSINT tool for gathering information from Telegram
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.ghunt(class="form-check-input") }}
+                                            <label class="form-check-label" for="ghunt">
+                                                <strong>GHunt</strong>
+                                                <span class="badge bg-danger ms-2">Expert</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Google account investigation tool for advanced OSINT research
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.video_downloader(class="form-check-input") }}
+                                            <label class="form-check-label" for="video_downloader">
+                                                <strong>Video Downloader</strong>
+                                                <span class="badge bg-info ms-2">Standard</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Download videos from YouTube, Vimeo, TikTok, and 1000+ other platforms
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Download Quota Settings -->
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-download"></i> Download Quota Settings
+                        </h6>
+                        <p class="text-muted mb-3">Configure download limits for video downloader tool:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_daily_downloads" class="form-label">Daily Downloads</label>
+                                    {{ form.max_daily_downloads(class="form-control") }}
+                                    {% if form.max_daily_downloads.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_daily_downloads.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Max downloads per day</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_storage_mb" class="form-label">Storage (MB)</label>
+                                    {{ form.max_storage_mb(class="form-control") }}
+                                    {% if form.max_storage_mb.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_storage_mb.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Max storage space</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_retention_days" class="form-label">Retention (Days)</label>
+                                    {{ form.max_retention_days(class="form-control") }}
+                                    {% if form.max_retention_days.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_retention_days.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">How long to keep files</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_file_size_mb" class="form-label">Max File Size (MB)</label>
+                                    {{ form.max_file_size_mb(class="form-control") }}
+                                    {% if form.max_file_size_mb.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_file_size_mb.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Max size per file</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Quota Presets:</strong>
+                            <div class="d-flex gap-2 flex-wrap mt-2">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="setQuotaPreset('basic')">
+                                    Basic (3/256MB/3d/100MB)
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="setQuotaPreset('standard')">
+                                    Standard (10/1GB/7d/500MB)
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="setQuotaPreset('analyst')">
+                                    Analyst (50/5GB/14d/1GB)
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="setQuotaPreset('admin')">
+                                    Admin (1000/10GB/30d/2GB)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.roles') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Roles
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Create Role
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Role Examples -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Role Examples</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-success">Researcher</h6>
+                        <ul class="list-unstyled small">
+                            <li><i class="bi bi-check text-success"></i> Holehe</li>
+                            <li><i class="bi bi-check text-success"></i> Sherlock</li>
+                            <li><i class="bi bi-x text-danger"></i> Instaloader</li>
+                            <li><i class="bi bi-x text-danger"></i> Telegram</li>
+                            <li><i class="bi bi-x text-danger"></i> GHunt</li>
+                        </ul>
+                        <p class="small text-muted">Basic research role for analysts</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Investigator</h6>
+                        <ul class="list-unstyled small">
+                            <li><i class="bi bi-check text-success"></i> Holehe</li>
+                            <li><i class="bi bi-check text-success"></i> Sherlock</li>
+                            <li><i class="bi bi-check text-success"></i> Instaloader</li>
+                            <li><i class="bi bi-check text-success"></i> Telegram</li>
+                            <li><i class="bi bi-check text-success"></i> GHunt</li>
+                        </ul>
+                        <p class="small text-muted">Full access for investigators</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-warning">Auditor</h6>
+                        <ul class="list-unstyled small">
+                            <li><i class="bi bi-check text-success"></i> Holehe</li>
+                            <li><i class="bi bi-x text-danger"></i> Sherlock</li>
+                            <li><i class="bi bi-x text-danger"></i> Instaloader</li>
+                            <li><i class="bi bi-x text-danger"></i> Telegram</li>
+                            <li><i class="bi bi-x text-danger"></i> GHunt</li>
+                        </ul>
+                        <p class="small text-muted">Limited access for compliance</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Templates -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-layers"></i> Quick Templates</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Click a template to quickly set up permissions:</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="applyTemplate('basic')">
+                        <i class="bi bi-eye"></i> Basic (Holehe only)
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="applyTemplate('standard')">
+                        <i class="bi bi-person"></i> Standard (Holehe + Sherlock)
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="applyTemplate('advanced')">
+                        <i class="bi bi-star"></i> Advanced (All except Instaloader)
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="applyTemplate('full')">
+                        <i class="bi bi-unlock"></i> Full Access (All tools)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Template application functions
+function applyTemplate(template) {
+    // Reset all checkboxes
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    
+    if (template === 'basic') {
+        document.getElementById('holehe').checked = true;
+    } else if (template === 'standard') {
+        document.getElementById('holehe').checked = true;
+        document.getElementById('sherlock').checked = true;
+    } else if (template === 'advanced') {
+        document.getElementById('holehe').checked = true;
+        document.getElementById('sherlock').checked = true;
+        document.getElementById('telegram').checked = true;
+    } else if (template === 'full') {
+        document.getElementById('holehe').checked = true;
+        document.getElementById('sherlock').checked = true;
+        document.getElementById('instaloader').checked = true;
+        document.getElementById('telegram').checked = true;
+        document.getElementById('ghunt').checked = true;
+        document.getElementById('video_downloader').checked = true;
+    }
+    
+    // Show visual feedback
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <i class="bi bi-check-circle"></i> Applied ${template} template
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
+
+// Set quota presets
+function setQuotaPreset(preset) {
+    if (preset === 'basic') {
+        document.getElementById('max_daily_downloads').value = 3;
+        document.getElementById('max_storage_mb').value = 256;
+        document.getElementById('max_retention_days').value = 3;
+        document.getElementById('max_file_size_mb').value = 100;
+    } else if (preset === 'standard') {
+        document.getElementById('max_daily_downloads').value = 10;
+        document.getElementById('max_storage_mb').value = 1024;
+        document.getElementById('max_retention_days').value = 7;
+        document.getElementById('max_file_size_mb').value = 500;
+    } else if (preset === 'analyst') {
+        document.getElementById('max_daily_downloads').value = 50;
+        document.getElementById('max_storage_mb').value = 5120;
+        document.getElementById('max_retention_days').value = 14;
+        document.getElementById('max_file_size_mb').value = 1024;
+    } else if (preset === 'admin') {
+        document.getElementById('max_daily_downloads').value = 1000;
+        document.getElementById('max_storage_mb').value = 10240;
+        document.getElementById('max_retention_days').value = 30;
+        document.getElementById('max_file_size_mb').value = 2048;
+    }
+    
+    // Show visual feedback
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-info alert-dismissible fade show position-fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <i class="bi bi-download"></i> Applied ${preset} quota preset
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
+
+// Auto-suggest role name based on permissions
+function updateRoleSuggestion() {
+    const checkedTools = document.querySelectorAll('input[type="checkbox"]:checked').length;
+    const nameField = document.getElementById('name');
+    
+    if (!nameField.value) {
+        let suggestion = '';
+        if (checkedTools === 1) {
+            suggestion = 'basic-user';
+        } else if (checkedTools === 2) {
+            suggestion = 'researcher';
+        } else if (checkedTools === 3) {
+            suggestion = 'investigator';
+        } else if (checkedTools === 4) {
+            suggestion = 'full-access';
+        }
+        
+        if (suggestion) {
+            nameField.setAttribute('placeholder', `Suggestion: ${suggestion}`);
+        }
+    }
+}
+
+// Listen for permission changes
+document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', updateRoleSuggestion);
+});
+
+// Validate form
+document.querySelector('form').addEventListener('submit', function(e) {
+    const hasAnyPermission = document.querySelector('input[type="checkbox"]:checked');
+    const roleName = document.getElementById('name').value.trim();
+    
+    if (!roleName) {
+        e.preventDefault();
+        alert('Please enter a role name.');
+        return false;
+    }
+    
+    if (!hasAnyPermission) {
+        if (!confirm('This role will have no tool permissions. Users with this role will not be able to use any OSINT tools. Continue?')) {
+            e.preventDefault();
+            return false;
+        }
+    }
+});
+
+// Auto-generate description based on permissions
+document.getElementById('name').addEventListener('input', function() {
+    const descField = document.getElementById('description');
+    if (!descField.value && this.value) {
+        const checkedTools = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(cb => cb.id).join(', ');
+        if (checkedTools) {
+            descField.value = `Role with access to: ${checkedTools}`;
+        }
+    }
+});
+</script>
+{% endblock %}

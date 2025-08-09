@@ -1,0 +1,28 @@
+{% macro render_field_with_errors(field, **kwargs) -%}
+  {{ field(class_=kwargs.pop('class', '') + (' is-invalid' if field.errors else ''), **kwargs) }}
+  {% if field.errors %}
+    <div class="invalid-feedback">
+      {% for error in field.errors %}
+        {{ error }}
+      {% endfor %}
+    </div>
+  {% endif %}
+{%- endmacro %}
+
+{% macro render_field(field, **kwargs) -%}
+  {{ field(**kwargs) }}
+{%- endmacro %}
+
+{% macro render_form_errors(form) -%}
+  {% if form.errors %}
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        {% for field, errors in form.errors.items() %}
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+{%- endmacro %}

@@ -1,0 +1,251 @@
+{% extends "base_new.html" %}
+
+{% block title %}System Configuration - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-gear"></i> System Configuration</h2>
+        <p class="text-muted mb-0">Manage system settings and configuration options</p>
+    </div>
+    <div class="badge bg-danger">Administrator Access</div>
+</div>
+
+<!-- Tor Corporate Proxy Configuration -->
+<div class="alert alert-warning" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-building fs-4 me-3"></i>
+        <div>
+            <h5 class="alert-heading mb-1">Corporate Proxy Configuration</h5>
+            <p class="mb-0">Configure Tor proxy settings for corporate environments where external status checks may be blocked.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Tor Configuration -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-shield-lock"></i> Tor Proxy Configuration</h6>
+            </div>
+            <div class="card-body">
+                <div id="torConfigStatus" class="mb-3">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 mb-0">Loading Tor configuration...</p>
+                    </div>
+                </div>
+                
+                <div id="torConfigContent" style="display: none;">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="externalChecksToggle">
+                        <label class="form-check-label" for="externalChecksToggle">
+                            <strong>Enable External Status Checks</strong>
+                        </label>
+                        <div class="form-text">
+                            Uncheck this option if you're behind a corporate proxy that blocks external services.
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-info-circle"></i> What This Setting Does:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Enabled (Default):</strong> Shows actual IP address and country from external services</li>
+                            <li><strong>Disabled (Corporate Mode):</strong> Skips external calls, shows "Corporate proxy mode"</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <h6><i class="bi bi-building"></i> Corporate Environment:</h6>
+                        <p class="mb-2">If you access this application from a corporate network, disable external checks to prevent status failures.</p>
+                        <strong>Blocked Services:</strong>
+                        <ul class="mb-0">
+                            <li>httpbin.org (IP lookup)</li>
+                            <li>ipapi.co (Geolocation)</li>
+                            <li>ip-api.com (Backup geolocation)</li>
+                        </ul>
+                    </div>
+                    
+                    <button class="btn btn-primary" id="saveTorConfig">
+                        <i class="bi bi-check-circle"></i> Save Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Environment Setup</h6>
+            </div>
+            <div class="card-body">
+                <h6>Permanent Configuration:</h6>
+                <p class="small">Set environment variable for persistent configuration:</p>
+                <div class="bg-dark text-white p-2 rounded mb-2">
+                    <code style="color: white;">export OSINT_TOR_EXTERNAL_CHECKS=false</code>
+                </div>
+                <p class="small text-muted">Add to shell profile or systemd service for permanent effect.</p>
+                
+                <hr>
+                
+                <h6>Current Mode:</h6>
+                <div id="currentModeDisplay" class="badge bg-secondary">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-tools"></i> Other Settings</h6>
+            </div>
+            <div class="card-body">
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-wrench fs-1 mb-3"></i>
+                    <h5>Additional Configuration Coming Soon</h5>
+                    <p class="mb-0">Database configuration, logging levels, performance tuning, and integration settings will be available in future updates.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Back Button -->
+<div class="mt-4">
+    <a href="{{ url_for('admin.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Admin Dashboard
+    </a>
+</div>
+
+<script>
+let currentTorConfig = null;
+
+async function loadTorConfig() {
+    const statusDiv = document.getElementById('torConfigStatus');
+    const contentDiv = document.getElementById('torConfigContent');
+    const modeDisplay = document.getElementById('currentModeDisplay');
+    
+    try {
+        const response = await fetch('/admin/tor-config');
+        if (!response.ok) {
+            throw new Error('Failed to load configuration');
+        }
+        
+        currentTorConfig = await response.json();
+        
+        // Update toggle state
+        document.getElementById('externalChecksToggle').checked = currentTorConfig.external_checks_enabled;
+        
+        // Update mode display
+        if (currentTorConfig.external_checks_enabled) {
+            modeDisplay.className = 'badge bg-success';
+            modeDisplay.textContent = 'Home/Direct Mode';
+        } else {
+            modeDisplay.className = 'badge bg-warning';
+            modeDisplay.textContent = 'Corporate Proxy Mode';
+        }
+        
+        // Show content, hide loading
+        statusDiv.style.display = 'none';
+        contentDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading Tor config:', error);
+        statusDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Error loading configuration: ${error.message}
+            </div>
+        `;
+    }
+}
+
+async function saveTorConfig() {
+    const saveBtn = document.getElementById('saveTorConfig');
+    const toggle = document.getElementById('externalChecksToggle');
+    const modeDisplay = document.getElementById('currentModeDisplay');
+    
+    const originalText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    
+    try {
+        const response = await fetch('/admin/tor-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({
+                action: 'toggle_external_checks',
+                enabled: toggle.checked
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Update mode display
+            if (result.external_checks_enabled) {
+                modeDisplay.className = 'badge bg-success';
+                modeDisplay.textContent = 'Home/Direct Mode';
+            } else {
+                modeDisplay.className = 'badge bg-warning';
+                modeDisplay.textContent = 'Corporate Proxy Mode';
+            }
+            
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-2';
+            alertDiv.innerHTML = `
+                <i class="bi bi-check-circle me-2"></i>${result.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.getElementById('torConfigContent').appendChild(alertDiv);
+            
+            // Auto-dismiss after 3 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 3000);
+            
+        } else {
+            throw new Error(result.error || 'Save failed');
+        }
+        
+    } catch (error) {
+        console.error('Error saving config:', error);
+        
+        // Reset toggle to previous state
+        toggle.checked = currentTorConfig.external_checks_enabled;
+        
+        // Show error message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-2';
+        alertDiv.innerHTML = `
+            <i class="bi bi-exclamation-triangle me-2"></i>Error: ${error.message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.getElementById('torConfigContent').appendChild(alertDiv);
+        
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    loadTorConfig();
+    
+    document.getElementById('saveTorConfig').addEventListener('click', saveTorConfig);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,467 @@
+{% extends "base_new.html" %}
+
+{% block title %}Holehe - Email Investigation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-2">📧 Holehe Email Investigation</h1>
+                <p class="text-muted mb-0">Check if an email is registered across multiple online platforms</p>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-success fs-6">🟢 Active</span>
+                <br>
+                <small class="text-muted">holehe v1.0.0</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Email Investigation</h5>
+            </div>
+            <div class="card-body">
+                <!-- Tor Status -->
+                {% include 'components/tor_status_compact.html' %}
+                
+                <form id="holeheForm">
+                    <!-- Investigation Selection -->
+                    <div class="mb-3">
+                        <label for="investigationSelect" class="form-label">Link to Investigation <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <select class="form-select" id="investigationSelect" name="investigation_id" required>
+                                <option value="">Select an investigation (required)</option>
+                                {% for investigation in investigations %}
+                                <option value="{{ investigation.id }}">
+                                    {{ investigation.name }}
+                                    {% if investigation.case_number %} - {{ investigation.case_number }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <a href="{{ url_for('investigations.create') }}" class="btn btn-outline-secondary" title="Create New Investigation">
+                                <i class="bi bi-plus-circle"></i>
+                            </a>
+                        </div>
+                        <div class="form-text">All searches must be linked to an investigation for tracking and organization</div>
+                    </div>
+                    
+                    <div class="email-input-group mb-3">
+                        <label for="emailInput" class="form-label">Email Address</label>
+                        <div class="input-group">
+                            <input type="email" 
+                                   class="form-control" 
+                                   id="emailInput" 
+                                   placeholder="Enter email address to investigate"
+                                   required>
+                            <button class="btn btn-primary" type="submit" id="checkButton">
+                                <span id="buttonText">Check Email</span>
+                                <span id="loadingSpinner" class="spinner-border spinner-border-sm loading-spinner" role="status"></span>
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" id="newSearchButton">
+                                <i class="bi bi-plus-circle"></i> New Search
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Search Options -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="forceRedoCheck">
+                                <label class="form-check-label" for="forceRedoCheck">
+                                    <small>Force redo (ignore duplicate detection)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <div id="alertContainer"></div>
+                
+                <div id="resultsContainer" class="results-container mt-4" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">Investigation Results:</h6>
+                        <div class="result-controls">
+                            <div class="form-check form-switch d-inline-block me-3">
+                                <input class="form-check-input" type="checkbox" id="showAllResults">
+                                <label class="form-check-label" for="showAllResults">
+                                    Show all results
+                                </label>
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm" id="downloadPdf" style="display: none;">
+                                📄 Download PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div id="resultsList"></div>
+                    <div id="summaryStats" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h6>About Holehe</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>What it does:</strong> Holehe checks if an email is registered across 120+ online platforms without alerting the target.</p>
+                <p class="mb-2"><strong>How it works:</strong> Uses "forgotten password" functions to determine account existence.</p>
+                <p class="mb-0"><strong>Use case:</strong> OSINT investigations, security research, and account enumeration.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('holeheForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('emailInput').value;
+    currentEmail = email;
+    const checkButton = document.getElementById('checkButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const alertContainer = document.getElementById('alertContainer');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsList = document.getElementById('resultsList');
+    const summaryStats = document.getElementById('summaryStats');
+    
+    // Show loading state
+    checkButton.disabled = true;
+    buttonText.textContent = 'Checking...';
+    loadingSpinner.style.display = 'inline-block';
+    alertContainer.innerHTML = '';
+    resultsContainer.style.display = 'none';
+    
+    try {
+        // Get selected investigation ID
+        const investigationId = document.getElementById('investigationSelect').value || null;
+        
+        // Check if investigation is selected
+        if (!investigationId) {
+            throw new Error('Please select an investigation to link this search to.');
+        }
+        
+        // Queue the search task
+        const queueResponse = await fetch('/api/search/queue', getTorFetchOptions({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            },
+            body: JSON.stringify({ 
+                tool_name: 'holehe',
+                query: email,
+                investigation_id: investigationId,
+                force_redo: document.getElementById('forceRedoCheck').checked
+            })
+        }));
+        
+        const queueData = await queueResponse.json();
+        
+        if (!queueResponse.ok) {
+            throw new Error(queueData.error || 'Failed to queue search');
+        }
+        
+        const searchId = queueData.search_id;
+        
+        // Update UI to show task is queued
+        buttonText.textContent = 'Processing...';
+        alertContainer.innerHTML = `
+            <div class="alert alert-info" role="alert">
+                <strong>Search queued!</strong> Processing email check in background...
+            </div>
+        `;
+        
+        // Poll for results
+        await pollForResults(searchId);
+        
+    } catch (error) {
+        alertContainer.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <strong>Error:</strong> ${error.message}
+            </div>
+        `;
+    } finally {
+        // Reset button state
+        checkButton.disabled = false;
+        buttonText.textContent = 'Check Email';
+        loadingSpinner.style.display = 'none';
+    }
+});
+
+let allResults = [];
+let currentEmail = '';
+
+async function pollForResults(searchId) {
+    const maxAttempts = 60; // Poll for up to 5 minutes (60 * 5 seconds)
+    let attempts = 0;
+    
+    const alertContainer = document.getElementById('alertContainer');
+    
+    while (attempts < maxAttempts) {
+        try {
+            // Check search status
+            const statusResponse = await fetch(`/api/search/${searchId}/status`);
+            const statusData = await statusResponse.json();
+            
+            if (!statusResponse.ok) {
+                throw new Error(statusData.error || 'Failed to check status');
+            }
+            
+            // Update progress
+            const progress = statusData.progress || 0;
+            alertContainer.innerHTML = `
+                <div class="alert alert-info" role="alert">
+                    <strong>Processing...</strong> ${statusData.status} 
+                    <div class="progress mt-2" style="height: 10px;">
+                        <div class="progress-bar" role="progressbar" style="width: ${progress}%" 
+                             aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            `;
+            
+            if (statusData.status === 'completed') {
+                // Get results
+                const resultsResponse = await fetch(`/api/search/${searchId}/results`);
+                const resultsData = await resultsResponse.json();
+                
+                if (!resultsResponse.ok) {
+                    throw new Error(resultsData.error || 'Failed to get results');
+                }
+                
+                // Clear alert and display results
+                alertContainer.innerHTML = `
+                    <div class="alert alert-success" role="alert">
+                        <strong>Search completed!</strong> Found ${resultsData.results_count} results.
+                    </div>
+                `;
+                
+                displayResults(resultsData.results);
+                return;
+            } else if (statusData.status === 'failed') {
+                throw new Error(statusData.error_message || 'Search failed');
+            } else if (statusData.status === 'cancelled') {
+                throw new Error('Search was cancelled');
+            }
+            
+            // Wait 5 seconds before next poll
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            attempts++;
+            
+        } catch (error) {
+            throw error;
+        }
+    }
+    
+    throw new Error('Search timed out. Please try again.');
+}
+
+function displayResults(results) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsList = document.getElementById('resultsList');
+    const summaryStats = document.getElementById('summaryStats');
+    const downloadPdf = document.getElementById('downloadPdf');
+    
+    // Store results globally
+    allResults = results;
+    
+    if (!results || results.length === 0) {
+        resultsList.innerHTML = '<p class="text-muted">No results found.</p>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+    
+    // Show download button
+    downloadPdf.style.display = 'inline-block';
+    
+    // Filter results based on checkbox - only show found accounts by default
+    const showAllResults = document.getElementById('showAllResults').checked;
+    const filteredResults = showAllResults ? results : results.filter(r => r.exists);
+    
+    // Generate results HTML
+    const resultsHtml = filteredResults.map(result => {
+        let statusClass, statusIcon, statusText, badgeClass;
+        
+        if (result.rate_limited) {
+            statusClass = 'rate-limited';
+            statusIcon = '⚠️';
+            statusText = 'Rate Limited';
+            badgeClass = 'bg-warning';
+        } else if (result.exists) {
+            statusClass = 'exists';
+            statusIcon = '✅';
+            statusText = 'Account Found';
+            badgeClass = 'bg-success';
+        } else {
+            statusClass = 'not-exists';
+            statusIcon = '❌';
+            statusText = 'No Account';
+            badgeClass = 'bg-secondary';
+        }
+        
+        let additionalInfo = '';
+        if (result.email_recovery) {
+            additionalInfo += `<small class="text-muted d-block">Recovery Email: ${result.email_recovery}</small>`;
+        }
+        if (result.phone_number) {
+            additionalInfo += `<small class="text-muted d-block">Phone: ${result.phone_number}</small>`;
+        }
+        
+        return `
+            <div class="result-item ${statusClass}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>${result.platform}</strong>
+                        <span class="badge ${badgeClass} ms-2">
+                            ${statusIcon} ${statusText}
+                        </span>
+                        ${additionalInfo}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    resultsList.innerHTML = resultsHtml;
+    
+    // Generate summary statistics
+    const totalPlatforms = results.length;
+    const foundAccounts = results.filter(r => r.exists).length;
+    const rateLimited = results.filter(r => r.rate_limited).length;
+    const displayedResults = filteredResults.length;
+    
+    summaryStats.innerHTML = `
+        <div class="row text-center">
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">${totalPlatforms}</h5>
+                        <p class="card-text">Platforms Checked</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">${foundAccounts}</h5>
+                        <p class="card-text">Accounts Found</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title text-warning">${rateLimited}</h5>
+                        <p class="card-text">Rate Limited</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title text-info">${displayedResults}</h5>
+                        <p class="card-text">Displayed</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    resultsContainer.style.display = 'block';
+}
+
+// Add event listener for checkbox
+document.getElementById('showAllResults').addEventListener('change', function() {
+    if (allResults.length > 0) {
+        displayResults(allResults);
+    }
+});
+
+// Add event listener for PDF download
+document.getElementById('downloadPdf').addEventListener('click', function() {
+    generatePDF();
+});
+
+// New Search button functionality
+document.getElementById('newSearchButton').addEventListener('click', function() {
+    // Clear the email input
+    document.getElementById('emailInput').value = '';
+    
+    // Keep investigation and Tor settings, but reset other elements
+    document.getElementById('forceRedoCheck').checked = false;
+    
+    // Clear results and alerts
+    document.getElementById('alertContainer').innerHTML = '';
+    document.getElementById('resultsContainer').style.display = 'none';
+    
+    // Reset button state
+    const checkButton = document.getElementById('checkButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    checkButton.disabled = false;
+    buttonText.textContent = 'Check Email';
+    loadingSpinner.style.display = 'none';
+    
+    // Focus on email input
+    document.getElementById('emailInput').focus();
+});
+
+function generatePDF() {
+    if (allResults.length === 0) return;
+    
+    const showAllResults = document.getElementById('showAllResults').checked;
+    const filteredResults = showAllResults ? allResults : allResults.filter(r => r.exists);
+    
+    // Create PDF data
+    const pdfData = {
+        email: currentEmail,
+        timestamp: new Date().toISOString(),
+        results: filteredResults,
+        summary: {
+            total: allResults.length,
+            found: allResults.filter(r => r.exists).length,
+            rateLimited: allResults.filter(r => r.rate_limited).length,
+            displayed: filteredResults.length
+        }
+    };
+    
+    // Send to server for PDF generation
+    fetch('/api/holehe/generate-pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pdfData)
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `holehe-results-${currentEmail}-${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    })
+    .catch(error => {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}MCP System Monitoring{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.metric-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.metric-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #2563eb;
+}
+
+.metric-label {
+    color: #6b7280;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.status-healthy { color: #10b981; }
+.status-degraded { color: #f59e0b; }
+.status-unhealthy { color: #ef4444; }
+
+.alert-critical {
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.alert-warning {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.chart-container {
+    height: 300px;
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1>MCP System Monitoring Dashboard</h1>
+    <p class="text-muted">Real-time monitoring of the OSINT Web MCP system</p>
+    
+    <!-- Overview Cards -->
+    <div class="grid" id="overview-cards">
+        <div class="metric-card">
+            <div class="metric-value" id="health-score">Loading...</div>
+            <div class="metric-label">System Health Score</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="active-connectors">Loading...</div>
+            <div class="metric-label">Active Connectors</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="success-rate">Loading...</div>
+            <div class="metric-label">Success Rate (24h)</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="recent-searches">Loading...</div>
+            <div class="metric-label">Recent Searches</div>
+        </div>
+    </div>
+    
+    <!-- Alerts Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>System Alerts</h3>
+            <div id="alerts-container">
+                <p class="text-muted">Loading alerts...</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4>Activity Over Time</h4>
+                <canvas id="activity-chart"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4>Tool Usage Distribution</h4>
+                <canvas id="tools-chart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Tables -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Connector Status</h4>
+                </div>
+                <div class="card-body">
+                    <div id="connectors-table">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Performance Metrics</h4>
+                </div>
+                <div class="card-body">
+                    <div id="performance-table">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let activityChart, toolsChart;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    loadOverview();
+    loadAlerts();
+    loadActivity();
+    loadConnectors();
+    loadPerformance();
+    
+    // Refresh every 30 seconds
+    setInterval(() => {
+        loadOverview();
+        loadAlerts();
+        loadActivity();
+        loadConnectors();
+        loadPerformance();
+    }, 30000);
+});
+
+function loadOverview() {
+    fetch('/monitoring/api/overview')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const overview = data.overview;
+                document.getElementById('health-score').textContent = overview.system_health.score + '%';
+                document.getElementById('active-connectors').textContent = overview.connectors.healthy + '/' + overview.connectors.total;
+                document.getElementById('success-rate').textContent = overview.dispatcher.success_rate + '%';
+                document.getElementById('recent-searches').textContent = overview.activity.recent_searches_24h;
+            }
+        })
+        .catch(error => console.error('Error loading overview:', error));
+}
+
+function loadAlerts() {
+    fetch('/monitoring/api/alerts')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const container = document.getElementById('alerts-container');
+                if (data.alerts.length === 0) {
+                    container.innerHTML = '<p class="text-success">✅ No active alerts</p>';
+                } else {
+                    let html = '';
+                    data.alerts.forEach(alert => {
+                        const alertClass = alert.level === 'critical' ? 'alert-critical' : 'alert-warning';
+                        html += `
+                            <div class="${alertClass}">
+                                <strong>${alert.title}</strong><br>
+                                ${alert.message}<br>
+                                <small class="text-muted">${new Date(alert.timestamp).toLocaleString()}</small>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                }
+            }
+        })
+        .catch(error => console.error('Error loading alerts:', error));
+}
+
+function loadActivity() {
+    fetch('/monitoring/api/activity?hours=24')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateActivityChart(data.activity);
+                updateToolsChart(data.activity);
+            }
+        })
+        .catch(error => console.error('Error loading activity:', error));
+}
+
+function updateActivityChart(activity) {
+    const ctx = document.getElementById('activity-chart').getContext('2d');
+    
+    if (activityChart) {
+        activityChart.destroy();
+    }
+    
+    const labels = activity.activity_by_hour.map(item => 
+        new Date(item.hour).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+    );
+    
+    activityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Searches',
+                data: activity.activity_by_hour.map(item => item.searches),
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function updateToolsChart(activity) {
+    const ctx = document.getElementById('tools-chart').getContext('2d');
+    
+    if (toolsChart) {
+        toolsChart.destroy();
+    }
+    
+    const tools = activity.most_used_tools.slice(0, 8); // Top 8 tools
+    
+    toolsChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: tools.map(item => item.tool),
+            datasets: [{
+                data: tools.map(item => item.count),
+                backgroundColor: [
+                    '#2563eb', '#10b981', '#f59e0b', '#ef4444',
+                    '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+function loadConnectors() {
+    fetch('/monitoring/api/connectors')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let html = '<table class="table table-sm"><thead><tr><th>Connector</th><th>Status</th><th>Usage</th></tr></thead><tbody>';
+                data.connectors.forEach(connector => {
+                    const statusClass = connector.status === 'healthy' ? 'status-healthy' : 
+                                      connector.status === 'degraded' ? 'status-degraded' : 'status-unhealthy';
+                    html += `
+                        <tr>
+                            <td>${connector.id}</td>
+                            <td><span class="${statusClass}">${connector.status}</span></td>
+                            <td>${connector.usage_stats || 0}</td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+                document.getElementById('connectors-table').innerHTML = html;
+            }
+        })
+        .catch(error => console.error('Error loading connectors:', error));
+}
+
+function loadPerformance() {
+    fetch('/monitoring/api/performance')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const perf = data.performance;
+                let html = `
+                    <div class="row">
+                        <div class="col-6">
+                            <strong>Success Rate:</strong><br>
+                            <span class="h4">${perf.overall.success_rate.toFixed(1)}%</span>
+                        </div>
+                        <div class="col-6">
+                            <strong>Avg Execution:</strong><br>
+                            <span class="h4">${perf.overall.avg_execution_time}s</span>
+                        </div>
+                    </div>
+                    <hr>
+                    <strong>Tool Performance:</strong>
+                    <table class="table table-sm mt-2">
+                        <thead><tr><th>Tool</th><th>Success Rate</th><th>Avg Time</th></tr></thead>
+                        <tbody>
+                `;
+                
+                Object.entries(perf.by_tool).forEach(([tool, stats]) => {
+                    html += `
+                        <tr>
+                            <td>${tool}</td>
+                            <td>${stats.success_rate.toFixed(1)}%</td>
+                            <td>${stats.avg_time.toFixed(1)}s</td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                document.getElementById('performance-table').innerHTML = html;
+            }
+        })
+        .catch(error => console.error('Error loading performance:', error));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+Run these commands after docker compose is up, inside the app container:
+
+1) flask --app wsgi db init
+2) flask --app wsgi db migrate -m "init tables"
+3) flask --app wsgi db upgrade
+
+Or you can exec directly:
+- docker compose exec app flask --app wsgi db init
+- docker compose exec app flask --app wsgi db migrate -m "init tables"
+- docker compose exec app flask --app wsgi db upgrade
+
+Note: We'll add Flask CLI factory later; for now rely on --app wsgi.

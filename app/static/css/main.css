@@ -1,0 +1,10 @@
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
+.container { max-width: 900px; margin: auto; }
+.flash { padding: .5rem 1rem; margin: .5rem 0; border-radius: 4px; }
+.flash.error { background: #ffe5e5; color: #7d0000; }
+.flash.success { background: #e5ffee; color: #006d3d; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; }
+th { background: #f6f6f6; text-align: left; }
+form.inline { display: inline; }
+.hidden { display: none; }

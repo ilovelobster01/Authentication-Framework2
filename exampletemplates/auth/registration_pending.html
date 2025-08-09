@@ -1,0 +1,99 @@
+{% extends "base_new.html" %}
+
+{% block title %}Registration Pending - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="bi bi-envelope-check fs-1 text-primary"></i>
+                </div>
+                
+                <h3 class="card-title mb-4">Check Your Email</h3>
+                
+                <p class="text-muted mb-4">
+                    We've sent a confirmation email to your registered email address. 
+                    Please check your inbox and click the confirmation link to activate your account.
+                </p>
+                
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-info-circle"></i> What's Next?
+                    </h6>
+                    <ul class="text-start mb-0">
+                        <li>Check your email inbox (and spam folder)</li>
+                        <li>Click the confirmation link in the email</li>
+                        <li>Your account will be automatically activated</li>
+                        <li>You'll be redirected to the dashboard</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <small>
+                        <strong>Note:</strong> The confirmation link expires in 5 days.
+                        If you don't receive the email within a few minutes, check your spam folder.
+                    </small>
+                </div>
+                
+                {% if config.DEBUG %}
+                <div class="alert alert-secondary">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-code"></i> Development Mode
+                    </h6>
+                    <p class="mb-1">
+                        <small>In development mode, emails are logged to the console instead of being sent.</small>
+                    </p>
+                    <p class="mb-0">
+                        <small>To manually confirm your account, visit: 
+                            <code>/auth/dev-confirm/your-email@example.com</code>
+                        </small>
+                    </p>
+                </div>
+                {% endif %}
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Home
+                    </a>
+                    
+                    <form method="POST" action="{{ url_for('security.send_confirmation') }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="bi bi-envelope"></i> Resend Email
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <small class="text-muted">
+                Having trouble? <a href="mailto:support@osint-web.local">Contact Support</a>
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh page every 30 seconds to check if user confirmed email
+setTimeout(function() {
+    // Check if user is now confirmed by making a quick AJAX request
+    fetch('/auth/check-confirmation-status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.confirmed) {
+                window.location.href = '{{ url_for("main.dashboard") }}';
+            }
+        })
+        .catch(error => {
+            // Silently ignore errors
+        });
+}, 30000);
+</script>
+{% endblock %}

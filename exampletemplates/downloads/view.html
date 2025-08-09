@@ -1,0 +1,418 @@
+{% extends "base_new.html" %}
+
+{% block title %}{{ download.title or download.filename or 'Download' }} - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>
+            {% if download.download_type.value == 'video' %}
+                <i class="bi bi-play-circle text-primary"></i>
+            {% elif download.download_type.value == 'audio' %}
+                <i class="bi bi-music-note text-success"></i>
+            {% elif download.download_type.value == 'image' %}
+                <i class="bi bi-image text-info"></i>
+            {% else %}
+                <i class="bi bi-file text-secondary"></i>
+            {% endif %}
+            {{ download.title or download.filename or 'Untitled Download' }}
+        </h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('downloads.index') }}">Downloads</a></li>
+                <li class="breadcrumb-item active">{{ download.title or download.filename or 'Download' }}</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="btn-group">
+        <a href="{{ url_for('downloads.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Downloads
+        </a>
+        {% if download.is_available %}
+            {% if download.download_id and download.download_id.startswith('vd_') %}
+                <!-- Video download - use video downloader API -->
+                <a href="/api/video-downloader/download-file/{{ download.download_id }}" class="btn btn-primary" target="_blank">
+                    <i class="bi bi-download"></i> Download File
+                </a>
+            {% else %}
+                <!-- Regular download - use downloads route -->
+                <a href="{{ url_for('downloads.download_file', download_id=download.id) }}" class="btn btn-primary">
+                    <i class="bi bi-download"></i> Download File
+                </a>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<!-- Status Alert -->
+{% if download.status.value == 'failed' %}
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle"></i>
+    <strong>Download Failed:</strong> {{ download.error_message or 'Unknown error occurred' }}
+</div>
+{% elif download.status.value == 'expired' %}
+<div class="alert alert-warning">
+    <i class="bi bi-clock-history"></i>
+    <strong>File Expired:</strong> This download has expired and the file has been removed.
+</div>
+{% elif download.status.value == 'cancelled' %}
+<div class="alert alert-secondary">
+    <i class="bi bi-stop-circle"></i>
+    <strong>Download Cancelled:</strong> This download was cancelled.
+</div>
+{% elif download.is_active %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    <strong>Download in Progress:</strong> 
+    {% if download.status.value == 'downloading' and download.progress_percent and download.progress_percent > 0 %}
+        {{ download.progress_percent }}% complete
+    {% elif download.status.value == 'queued' %}
+        Queued for download{% if download.queue_position %} (position {{ download.queue_position }}){% endif %}
+    {% elif download.status.value == 'analyzing' %}
+        Analyzing video formats and metadata
+    {% else %}
+        Processing...
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Download Information -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Download Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Status:</strong></div>
+                    <div class="col-sm-9">
+                        {% if download.status.value == 'completed' %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Completed
+                            </span>
+                        {% elif download.status.value == 'downloading' %}
+                            <span class="badge bg-primary">
+                                <i class="bi bi-download"></i> Downloading
+                                {% if download.progress_percent and download.progress_percent > 0 %}
+                                    ({{ download.progress_percent }}%)
+                                {% endif %}
+                            </span>
+                        {% elif download.status.value == 'queued' %}
+                            <span class="badge bg-warning">
+                                <i class="bi bi-clock"></i> Queued
+                                {% if download.queue_position %}
+                                    (#{{ download.queue_position }})
+                                {% endif %}
+                            </span>
+                        {% elif download.status.value == 'analyzing' %}
+                            <span class="badge bg-info">
+                                <i class="bi bi-search"></i> Analyzing
+                            </span>
+                        {% elif download.status.value == 'pending' %}
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-hourglass"></i> Pending
+                            </span>
+                        {% elif download.status.value == 'failed' %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-x-circle"></i> Failed
+                            </span>
+                        {% elif download.status.value == 'expired' %}
+                            <span class="badge bg-dark">
+                                <i class="bi bi-clock-history"></i> Expired
+                            </span>
+                        {% elif download.status.value == 'cancelled' %}
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-stop-circle"></i> Cancelled
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if download.uploader %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Uploader:</strong></div>
+                    <div class="col-sm-9">{{ download.uploader }}</div>
+                </div>
+                {% endif %}
+                
+                {% if download.platform %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Platform:</strong></div>
+                    <div class="col-sm-9">
+                        <span class="badge bg-light text-dark">{{ download.platform }}</span>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if download.duration %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Duration:</strong></div>
+                    <div class="col-sm-9">{{ download.duration_formatted }}</div>
+                </div>
+                {% endif %}
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Type:</strong></div>
+                    <div class="col-sm-9">
+                        <span class="badge bg-secondary">{{ download.download_type.value.title() }}</span>
+                    </div>
+                </div>
+                
+                {% if download.requested_quality %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Quality:</strong></div>
+                    <div class="col-sm-9">{{ download.requested_quality }}</div>
+                </div>
+                {% endif %}
+                
+                {% if download.file_format %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Format:</strong></div>
+                    <div class="col-sm-9">{{ download.file_format.upper() }}</div>
+                </div>
+                {% endif %}
+                
+                {% if download.file_size %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>File Size:</strong></div>
+                    <div class="col-sm-9">{{ download.file_size_mb }} MB</div>
+                </div>
+                {% endif %}
+                
+                {% if download.filename %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Filename:</strong></div>
+                    <div class="col-sm-9"><code>{{ download.filename }}</code></div>
+                </div>
+                {% endif %}
+                
+                {% if download.original_url %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Source URL:</strong></div>
+                    <div class="col-sm-9">
+                        <a href="{{ download.original_url }}" target="_blank" class="text-break">
+                            {{ download.original_url }}
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if download.description %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Description:</strong></div>
+                    <div class="col-sm-9">
+                        <div style="max-height: 150px; overflow-y: auto;">
+                            {{ download.description }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Progress Bar for Active Downloads -->
+        {% if download.is_active and download.progress_percent and download.progress_percent > 0 %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-arrow-down-circle"></i> Download Progress</h6>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-2">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         style="width: {{ download.progress_percent }}%">
+                        {{ download.progress_percent }}%
+                    </div>
+                </div>
+                <small class="text-muted">{{ download.progress_percent }}% complete</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Timeline -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-clock-history"></i> Timeline</h6>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-primary"></div>
+                        <div class="timeline-content">
+                            <h6>Created</h6>
+                            <p class="text-muted mb-0">
+                                {{ download.created_at.strftime('%Y-%m-%d %H:%M:%S') if download.created_at else 'Unknown' }}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {% if download.started_at %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-info"></div>
+                        <div class="timeline-content">
+                            <h6>Started</h6>
+                            <p class="text-muted mb-0">
+                                {{ download.started_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if download.completed_at %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker {% if download.status.value == 'completed' %}bg-success{% else %}bg-danger{% endif %}"></div>
+                        <div class="timeline-content">
+                            <h6>
+                                {% if download.status.value == 'completed' %}
+                                    Completed
+                                {% elif download.status.value == 'failed' %}
+                                    Failed
+                                {% elif download.status.value == 'cancelled' %}
+                                    Cancelled
+                                {% else %}
+                                    Finished
+                                {% endif %}
+                            </h6>
+                            <p class="text-muted mb-0">
+                                {{ download.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if download.expires_at %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker {% if download.is_expired %}bg-dark{% else %}bg-warning{% endif %}"></div>
+                        <div class="timeline-content">
+                            <h6>{% if download.is_expired %}Expired{% else %}Expires{% endif %}</h6>
+                            <p class="text-muted mb-0">
+                                {{ download.expires_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </p>
+                            {% if not download.is_expired and download.time_remaining %}
+                            <small class="text-muted">
+                                ({{ download.time_remaining.days }} days remaining)
+                            </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if download.accessed_at %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-secondary"></div>
+                        <div class="timeline-content">
+                            <h6>Last Accessed</h6>
+                            <p class="text-muted mb-0">
+                                {{ download.accessed_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> Actions</h6>
+            </div>
+            <div class="card-body">
+                {% if download.is_available %}
+                    {% if download.download_id and download.download_id.startswith('vd_') %}
+                        <!-- Video download - use video downloader API -->
+                        <a href="/api/video-downloader/download-file/{{ download.download_id }}" 
+                           class="btn btn-primary btn-sm mb-2 w-100" target="_blank">
+                            <i class="bi bi-download"></i> Download File
+                        </a>
+                    {% else %}
+                        <!-- Regular download - use downloads route -->
+                        <a href="{{ url_for('downloads.download_file', download_id=download.id) }}" 
+                           class="btn btn-primary btn-sm mb-2 w-100">
+                            <i class="bi bi-download"></i> Download File
+                        </a>
+                    {% endif %}
+                {% endif %}
+                
+                {% if download.is_active %}
+                <form method="post" action="{{ url_for('downloads.cancel', download_id=download.id) }}" class="mb-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-warning btn-sm w-100"
+                            onclick="return confirm('Cancel this download?')">
+                        <i class="bi bi-stop"></i> Cancel Download
+                    </button>
+                </form>
+                {% endif %}
+                
+                <form method="post" action="{{ url_for('downloads.delete', download_id=download.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100"
+                            onclick="return confirm('Delete this download? This action cannot be undone.')">
+                        <i class="bi bi-trash"></i> Delete Download
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #dee2e6;
+}
+
+.timeline-content h6 {
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.timeline-content p {
+    font-size: 0.8rem;
+    margin-bottom: 0;
+}
+</style>
+
+<!-- Auto-refresh for active downloads -->
+{% if download.is_active %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Refresh page every 5 seconds for active downloads
+    setTimeout(() => {
+        location.reload();
+    }, 5000);
+});
+</script>
+{% endif %}
+
+{% endblock %}

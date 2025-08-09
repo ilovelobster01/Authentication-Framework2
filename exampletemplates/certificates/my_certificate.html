@@ -1,0 +1,278 @@
+{% extends "base_new.html" %}
+
+{% block title %}My Certificate - OSINT Web Toolkit{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-shield-person"></i> My Certificate</h1>
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+
+            <!-- Current Certificate Status -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-shield-check"></i> Certificate Status</h5>
+                </div>
+                <div class="card-body">
+                    {% if cert %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <dl class="row">
+                                    <dt class="col-sm-5">Status:</dt>
+                                    <dd class="col-sm-7">
+                                        <span class="badge bg-{{ 'success' if cert.is_valid else ('danger' if cert.revoked else 'warning') }} fs-6">
+                                            {{ cert.status }}
+                                        </span>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-5">Serial Number:</dt>
+                                    <dd class="col-sm-7"><code>{{ cert.serial_number }}</code></dd>
+                                    
+                                    <dt class="col-sm-5">Issued:</dt>
+                                    <dd class="col-sm-7">{{ cert.issued_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                                    
+                                    <dt class="col-sm-5">Expires:</dt>
+                                    <dd class="col-sm-7">
+                                        {{ cert.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                                        {% if cert.is_valid %}
+                                            <br><small class="text-muted">({{ cert.days_until_expiry }} days remaining)</small>
+                                        {% endif %}
+                                    </dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-6">
+                                <dl class="row">
+                                    {% if cert.last_used_at %}
+                                    <dt class="col-sm-5">Last Used:</dt>
+                                    <dd class="col-sm-7">
+                                        {{ cert.last_used_at.strftime('%Y-%m-%d %H:%M') }}
+                                        <br><small class="text-muted">({{ cert.usage_count }} times total)</small>
+                                    </dd>
+                                    {% endif %}
+                                    
+                                    {% if cert.revoked %}
+                                    <dt class="col-sm-5">Revoked:</dt>
+                                    <dd class="col-sm-7">
+                                        {{ cert.revoked_at.strftime('%Y-%m-%d %H:%M') }}
+                                        <br><small class="text-muted">Reason: {{ cert.revoked_reason }}</small>
+                                    </dd>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                        </div>
+
+                        {% if cert.is_valid %}
+                            {% if cert.days_until_expiry <= 30 %}
+                                <div class="alert alert-warning" role="alert">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <strong>Certificate Expiring Soon!</strong>
+                                    Your certificate will expire in {{ cert.days_until_expiry }} days. 
+                                    Please contact your administrator to renew it before it expires.
+                                </div>
+                            {% endif %}
+                        {% elif cert.revoked %}
+                            <div class="alert alert-danger" role="alert">
+                                <i class="bi bi-shield-x"></i>
+                                <strong>Certificate Revoked!</strong>
+                                Your certificate has been revoked and can no longer be used for authentication.
+                                Please contact your administrator for a new certificate.
+                            </div>
+                        {% elif cert.is_expired %}
+                            <div class="alert alert-danger" role="alert">
+                                <i class="bi bi-clock"></i>
+                                <strong>Certificate Expired!</strong>
+                                Your certificate has expired and can no longer be used for authentication.
+                                Please contact your administrator for a new certificate.
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-shield-x fs-1 text-muted"></i>
+                            <h4 class="text-muted mt-3">No Certificate Found</h4>
+                            <p class="text-muted">You don't have an active certificate yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Certificate Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-tools"></i> Actions</h5>
+                </div>
+                <div class="card-body">
+                    {% if cert and cert.is_valid %}
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <h6><i class="bi bi-download"></i> Download Certificate</h6>
+                                <p class="text-muted">Download your certificate for installation in your browser.</p>
+                                <a href="{{ url_for('certificates.download_certificate', cert_id=cert.id) }}" 
+                                   class="btn btn-primary">
+                                    <i class="bi bi-download"></i> Download P12 File
+                                </a>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <strong>Import Password:</strong> <code>{{ download_info.p12_password if download_info else 'N/A' }}</code>
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="bi bi-info-circle"></i> Installation Instructions</h6>
+                                <p class="text-muted">Follow these steps to install your certificate:</p>
+                                <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#installInstructions">
+                                    <i class="bi bi-question-circle"></i> View Instructions
+                                </button>
+                            </div>
+                        </div>
+                    {% elif not cert %}
+                        <div class="text-center">
+                            <h6><i class="bi bi-shield-plus"></i> Request Certificate</h6>
+                            <p class="text-muted">Request a new certificate for secure authentication.</p>
+                            <form method="post" action="{{ url_for('certificates.request_certificate') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-success" 
+                                        onclick="return confirm('Request a new certificate? This will allow you to access the system securely.')">
+                                    <i class="bi bi-shield-plus"></i> Request New Certificate
+                                </button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <div class="text-center">
+                            <h6><i class="bi bi-exclamation-triangle text-warning"></i> Certificate Issue</h6>
+                            <p class="text-muted">Your certificate is {{ cert.status.lower() }}. Please contact your administrator for assistance.</p>
+                            <a href="mailto:admin@example.com" class="btn btn-outline-primary">
+                                <i class="bi bi-envelope"></i> Contact Administrator
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Information Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Client Certificates</h5>
+                </div>
+                <div class="card-body">
+                    <p>Client certificates provide an additional layer of security by requiring you to present a digital certificate stored in your browser before accessing the system.</p>
+                    
+                    <h6>Key Points:</h6>
+                    <ul>
+                        <li><strong>Security:</strong> Certificates are required to access this system</li>
+                        <li><strong>Installation:</strong> Must be installed in your browser's certificate store</li>
+                        <li><strong>Expiration:</strong> Certificates have a limited validity period</li>
+                        <li><strong>Revocation:</strong> Certificates can be revoked if compromised</li>
+                    </ul>
+                    
+                    <h6>Supported Browsers:</h6>
+                    <ul class="mb-0">
+                        <li>Chrome / Edge: Settings → Privacy and security → Security → Manage device certificates</li>
+                        <li>Firefox: Settings → Privacy & Security → Certificates → View Certificates → Your Certificates</li>
+                        <li>Safari: Keychain Access application (macOS)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Installation Instructions Modal -->
+<div class="modal fade" id="installInstructions" tabindex="-1" aria-labelledby="installInstructionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="installInstructionsLabel">
+                    <i class="bi bi-info-circle"></i> Certificate Installation Instructions
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="accordion" id="browserInstructions">
+                    <!-- Chrome/Edge Instructions -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="chromeHeader">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#chromeInstructions" aria-expanded="true" aria-controls="chromeInstructions">
+                                <i class="bi bi-browser-chrome me-2"></i> Chrome / Edge
+                            </button>
+                        </h2>
+                        <div id="chromeInstructions" class="accordion-collapse collapse show" aria-labelledby="chromeHeader" data-bs-parent="#browserInstructions">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Download your P12 certificate file</li>
+                                    <li>Open Chrome/Edge Settings</li>
+                                    <li>Navigate to <strong>Privacy and security → Security</strong></li>
+                                    <li>Click <strong>Manage device certificates</strong></li>
+                                    <li>Go to the <strong>Personal</strong> tab</li>
+                                    <li>Click <strong>Import</strong></li>
+                                    <li>Select your P12 file and enter the password</li>
+                                    <li>Restart your browser</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Firefox Instructions -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="firefoxHeader">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#firefoxInstructions" aria-expanded="false" aria-controls="firefoxInstructions">
+                                <i class="bi bi-browser-firefox me-2"></i> Firefox
+                            </button>
+                        </h2>
+                        <div id="firefoxInstructions" class="accordion-collapse collapse" aria-labelledby="firefoxHeader" data-bs-parent="#browserInstructions">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Download your P12 certificate file</li>
+                                    <li>Open Firefox Settings</li>
+                                    <li>Navigate to <strong>Privacy & Security</strong></li>
+                                    <li>Scroll down to <strong>Certificates</strong></li>
+                                    <li>Click <strong>View Certificates</strong></li>
+                                    <li>Go to the <strong>Your Certificates</strong> tab</li>
+                                    <li>Click <strong>Import</strong></li>
+                                    <li>Select your P12 file and enter the password</li>
+                                    <li>Restart Firefox</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Safari Instructions -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="safariHeader">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#safariInstructions" aria-expanded="false" aria-controls="safariInstructions">
+                                <i class="bi bi-browser-safari me-2"></i> Safari (macOS)
+                            </button>
+                        </h2>
+                        <div id="safariInstructions" class="accordion-collapse collapse" aria-labelledby="safariHeader" data-bs-parent="#browserInstructions">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Download your P12 certificate file</li>
+                                    <li>Double-click the P12 file</li>
+                                    <li>Keychain Access will open automatically</li>
+                                    <li>Enter the certificate password when prompted</li>
+                                    <li>Choose to add to the <strong>login</strong> keychain</li>
+                                    <li>Enter your macOS password to confirm</li>
+                                    <li>Restart Safari</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Important:</strong> After installing your certificate, you may need to restart your browser for the changes to take effect.
+                    When accessing the system, your browser will prompt you to select the certificate for authentication.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

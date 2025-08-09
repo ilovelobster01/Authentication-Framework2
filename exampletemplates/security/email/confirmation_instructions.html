@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Your TIOS Account</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .email-container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .confirm-button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .confirm-button:hover {
+            background-color: #0056b3;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="logo">🔒 TIOS Web Toolkit</div>
+            <h2>Welcome to Our Platform!</h2>
+        </div>
+        
+        <p>Thank you for registering an account with TIOS Web Toolkit. We're excited to have you join our tactical internet operations support platform.</p>
+        
+        <p>To complete your registration and activate your account, please click the button below:</p>
+        
+        <div style="text-align: center;">
+            <a href="{{ confirmation_link }}" class="confirm-button">Confirm Your Account</a>
+        </div>
+        
+        <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
+        <p style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all;">
+            {{ confirmation_link }}
+        </p>
+        
+        <div class="warning">
+            <strong>Important:</strong>
+            <ul>
+                <li>This confirmation link will expire in <strong>5 days</strong></li>
+                <li>The link can only be used once for security purposes</li>
+                <li>If you didn't create this account, please ignore this email</li>
+            </ul>
+        </div>
+        
+        <p>Once your account is confirmed, you'll have access to our suite of OSINT tools including:</p>
+        <ul>
+            <li>🔍 <strong>Holehe</strong> - Email account enumeration</li>
+            <li>👤 <strong>Sherlock</strong> - Username investigation across social platforms</li>
+            <li>📱 <strong>Telegram</strong> - Public channel analysis</li>
+            <li>📊 <strong>Investigation Management</strong> - Organize and track your research</li>
+        </ul>
+        
+        <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+        
+        <p>Best regards,<br>
+        The TIOS Team</p>
+        
+        <div class="footer">
+            This is an automated message from TIOS Web Toolkit.<br>
+            Please do not reply to this email.
+        </div>
+    </div>
+</body>
+</html>

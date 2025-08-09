@@ -1,0 +1,459 @@
+{% extends "base_new.html" %}
+
+{% block title %}{{ investigation.name }} - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-folder2-open"></i> {{ investigation.name }}</h2>
+        {% if investigation.case_number %}
+        <p class="text-muted mb-0">Case Number: {{ investigation.case_number }}</p>
+        {% endif %}
+    </div>
+    <div>
+        <a href="{{ url_for('investigations.edit', id=investigation.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        {% if investigation.status != 'archived' %}
+        <button type="button" class="btn btn-outline-warning" onclick="archiveInvestigation({{ investigation.id }})">
+            <i class="bi bi-archive"></i> Archive
+        </button>
+        {% else %}
+        <button type="button" class="btn btn-outline-success" onclick="unarchiveInvestigation({{ investigation.id }})">
+            <i class="bi bi-arrow-up-circle"></i> Unarchive
+        </button>
+        {% endif %}
+        <a href="{{ url_for('investigations.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Investigations
+        </a>
+    </div>
+</div>
+
+<!-- Investigation Details -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Investigation Details</h5>
+            </div>
+            <div class="card-body">
+                {% if investigation.description %}
+                <div class="mb-3">
+                    <h6>Description</h6>
+                    <p class="text-muted">{{ investigation.description }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Status</h6>
+                        <span class="badge bg-{% if investigation.status == 'active' %}success{% elif investigation.status == 'completed' %}primary{% else %}secondary{% endif %} mb-3">
+                            {{ investigation.status.title() }}
+                        </span>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Priority</h6>
+                        <span class="badge bg-{% if investigation.priority == 'high' %}danger{% elif investigation.priority == 'medium' %}warning{% else %}secondary{% endif %} mb-3">
+                            {{ investigation.priority.title() }}
+                        </span>
+                    </div>
+                </div>
+                
+                {% if investigation.tags %}
+                <div class="mb-3">
+                    <h6>Tags</h6>
+                    {% for tag in investigation.tags %}
+                    <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <small class="text-muted">Created: {{ investigation.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted">Updated: {{ investigation.updated_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Statistics</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ investigation.search_count }}</h4>
+                        <small class="text-muted">Total Searches</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">{{ searches_completed }}</h4>
+                        <small class="text-muted">Completed</small>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-info">{{ download_stats.total }}</h4>
+                        <small class="text-muted">Total Downloads</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-dark">{{ download_stats.tor_used }}</h4>
+                        <small class="text-muted"><i class="bi bi-shield-lock"></i> TOR Used</small>
+                    </div>
+                </div>
+                
+                {% if investigation.latest_search %}
+                <hr>
+                <div class="text-center">
+                    <h6>Latest Search</h6>
+                    <p class="mb-1">{{ investigation.latest_search.tool_name.upper() }}</p>
+                    <small class="text-muted">{{ investigation.latest_search.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Searches in this Investigation -->
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-search"></i> Searches</h5>
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle"></i> New Search
+                </a>
+                {% if searches %}
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                    Actions
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="generateReport()">
+                        <i class="bi bi-file-earmark-pdf"></i> Generate Report
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportData()">
+                        <i class="bi bi-download"></i> Export Data
+                    </a></li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if searches %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tool</th>
+                        <th>Query</th>
+                        <th>Status</th>
+                        <th>Results</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for search in searches %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-info">{{ search.tool_name.upper() }}</span>
+                        </td>
+                        <td>
+                            <code class="text-truncate d-inline-block" style="max-width: 200px;">
+                                {{ search.search_query }}
+                            </code>
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if search.status.value == 'completed' %}success{% elif search.status.value == 'running' %}warning{% elif search.status.value == 'failed' %}danger{% else %}secondary{% endif %}">
+                                {{ search.status.value.title() }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if search.results_count %}
+                            <span class="badge bg-success">{{ search.results_count }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ search.created_at.strftime('%m/%d %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('searches.view', id=search.id) }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if search.status.value == 'completed' and search.results %}
+                                <a href="{{ url_for('searches.view_results', id=search.id) }}" class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-list-ul"></i>
+                                </a>
+                                {% endif %}
+                                {% if search.status.value == 'failed' %}
+                                <a href="{{ url_for('searches.retry', id=search.id) }}" class="btn btn-outline-warning btn-sm">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-search fs-1 text-muted"></i>
+            <h5 class="mt-3">No Searches Yet</h5>
+            <p class="text-muted">Start your investigation by running OSINT searches.</p>
+            <a href="{{ url_for('main.holehe') }}" class="btn btn-primary me-2">
+                <i class="bi bi-envelope"></i> Holehe
+            </a>
+            <a href="{{ url_for('main.sherlock') }}" class="btn btn-primary me-2">
+                <i class="bi bi-person"></i> Sherlock
+            </a>
+            <a href="{{ url_for('main.instaloader') }}" class="btn btn-primary me-2">
+                <i class="bi bi-camera"></i> Instaloader
+            </a>
+            <a href="{{ url_for('main.telegram') }}" class="btn btn-primary">
+                <i class="bi bi-chat"></i> Telegram
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Downloads in this Investigation -->
+<div class="card mt-4">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-download"></i> Downloads</h5>
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('main.video_downloader') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle"></i> New Download
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if downloads %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>TOR</th>
+                        <th>Status</th>
+                        <th>Size</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for download in downloads %}
+                    <tr>
+                        <td>
+                            {% if download.download_type.value == 'video' %}
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-play-circle"></i> Video
+                                </span>
+                            {% elif download.download_type.value == 'audio' %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-music-note"></i> Audio
+                                </span>
+                            {% elif download.download_type.value == 'image' %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-image"></i> Image
+                                </span>
+                            {% elif download.download_type.value == 'document' %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-file-text"></i> Document
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-file"></i> Other
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('downloads.view', download_id=download.id) }}" class="text-decoration-none fw-bold">
+                                {{ download.title or download.filename or 'Untitled' }}
+                            </a>
+                            {% if download.uploader %}
+                            <br><small class="text-muted">by {{ download.uploader }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if download.use_tor %}
+                                <span class="badge bg-dark">
+                                    <i class="bi bi-shield-lock"></i> TOR
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if download.status.value == 'completed' %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Completed
+                                </span>
+                            {% elif download.status.value == 'downloading' %}
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-download"></i> Downloading
+                                </span>
+                            {% elif download.status.value == 'failed' %}
+                                <span class="badge bg-danger">
+                                    <i class="bi bi-x-circle"></i> Failed
+                                </span>
+                            {% elif download.status.value == 'cancelled' %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-stop-circle"></i> Cancelled
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-clock"></i> {{ download.status.value.title() }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if download.file_size %}
+                                {{ (download.file_size / 1024 / 1024) | round(1) }} MB
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ download.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('downloads.view', download_id=download.id) }}" class="btn btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if download.is_available %}
+                                    {% if download.download_id and download.download_id.startswith('vd_') %}
+                                        <!-- Video download - use video downloader API -->
+                                        <a href="/api/video-downloader/download-file/{{ download.download_id }}" 
+                                           class="btn btn-outline-success" target="_blank" title="Download File">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    {% else %}
+                                        <!-- Regular download - use downloads route -->
+                                        <a href="{{ url_for('downloads.download_file', download_id=download.id) }}" 
+                                           class="btn btn-outline-success" title="Download File">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-download fs-1 text-muted"></i>
+            <h5 class="mt-3">No Downloads Yet</h5>
+            <p class="text-muted">Download videos, audio, or other content for this investigation.</p>
+            <a href="{{ url_for('main.video_downloader') }}" class="btn btn-primary">
+                <i class="bi bi-play-circle"></i> Video Downloader
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function generateReport() {
+    // Show confirmation dialog
+    if (!confirm('Generate a comprehensive report for this investigation? This will include all positive findings from completed searches.')) {
+        return;
+    }
+    
+    // Create a form and submit it to trigger the report generation
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("investigations.generate_report", id=investigation.id) }}';
+    
+    // Add CSRF token if available
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = csrfToken.getAttribute('content');
+        form.appendChild(csrfInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function exportData() {
+    // TODO: Implement data export
+    alert('Data export feature coming soon!');
+}
+
+function archiveInvestigation(investigationId) {
+    if (!confirm('Are you sure you want to archive this investigation? It will be moved to the archived section.')) {
+        return;
+    }
+    
+    fetch(`{{ url_for('investigations.archive', id=0) }}`.replace('0', investigationId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error archiving investigation: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error archiving investigation. Please try again.');
+    });
+}
+
+function unarchiveInvestigation(investigationId) {
+    if (!confirm('Are you sure you want to unarchive this investigation? It will be moved back to active status.')) {
+        return;
+    }
+    
+    fetch(`{{ url_for('investigations.unarchive', id=0) }}`.replace('0', investigationId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error unarchiving investigation: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error unarchiving investigation. Please try again.');
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1707 @@
+{% extends "base_new.html" %}
+
+{% block title %}GHunt - Google Account Investigation - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="bi bi-google"></i> GHunt - Google Account Investigation</h2>
+                    <p class="text-muted mb-0">Investigate Google accounts, YouTube channels, and documents using advanced OSINT techniques</p>
+                </div>
+                <div class="text-end">
+                    <small class="text-muted">Powered by GHunt OSINT Framework</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tor Status Widget -->
+    <div class="row mb-4">
+        <div class="col-12">
+            {% include 'components/tor_status_compact.html' %}
+        </div>
+    </div>
+
+    <!-- GHunt Status Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>GHunt v2 Integration:</strong> Full authentication flow implemented. The tool will automatically generate OSIDs from your cookies and perform comprehensive Google OSINT investigations.
+                <details class="mt-2">
+                    <summary>How it works</summary>
+                    <small>This integration validates your cookies, generates required OSIDs for Google services, and uses the full GHunt v2 API to perform investigations. Results include profile data, account information, and associated services.</small>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-search"></i> Search Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form id="ghuntForm" novalidate>
+                        <!-- Investigation Selection -->
+                        <div class="mb-3">
+                            <label for="investigationSelect" class="form-label">Link to Investigation <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <select class="form-select" id="investigationSelect" name="investigation_id" required>
+                                    <option value="">Select an investigation (required)</option>
+                                    {% for investigation in investigations %}
+                                    <option value="{{ investigation.id }}">
+                                        {{ investigation.name }}
+                                        {% if investigation.case_number %} - {{ investigation.case_number }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <a href="{{ url_for('investigations.create') }}" class="btn btn-outline-secondary" title="Create New Investigation">
+                                    <i class="bi bi-plus-circle"></i>
+                                </a>
+                            </div>
+                            <div class="form-text">All searches must be linked to an investigation for tracking and organization</div>
+                        </div>
+
+                        <!-- Search Type Selection -->
+                        <div class="mb-3">
+                            <label for="searchType" class="form-label">Search Type</label>
+                            <select class="form-select" id="searchType" name="search_type" required>
+                                <option value="">Select search type</option>
+                                <option value="email">Email Address Investigation</option>
+                                <option value="gaia">Google Gaia ID Investigation</option>
+                                <option value="drive">Google Drive File/Folder Investigation</option>
+                            </select>
+                        </div>
+
+                        <!-- Dynamic Input Field -->
+                        <div class="mb-3" id="targetInputGroup">
+                            <label for="targetInput" class="form-label" id="targetLabel">Target</label>
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="targetInput" 
+                                       placeholder="Enter target for investigation"
+                                       required>
+                                <button class="btn btn-primary" type="submit" id="searchButton">
+                                    <span id="buttonText">Investigate</span>
+                                    <span id="loadingSpinner" class="spinner-border spinner-border-sm loading-spinner" role="status"></span>
+                                </button>
+                                <button class="btn btn-outline-secondary" type="button" id="newSearchButton">
+                                    <i class="bi bi-plus-circle"></i> New Search
+                                </button>
+                            </div>
+                            <div class="form-text" id="targetHelp">Select a search type to see specific instructions</div>
+                        </div>
+
+                        <!-- GHunt Authentication -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="companionInput" class="form-label mb-0">
+                                    <i class="bi bi-key me-1"></i>
+                                    GHunt Authentication
+                                </label>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="checkAuthStatus()" title="Refresh Status">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" onclick="clearAuthentication()" title="Clear Authentication">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Authentication Status Display -->
+                            <div id="authStatusDisplay" class="mb-3">
+                                <div class="alert alert-info mb-2" id="authStatusCard">
+                                    <div class="d-flex align-items-center">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status" id="authSpinner">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span>Checking authentication status...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Companion Cookie Input -->
+                            <div id="authInputSection">
+                                <textarea class="form-control mb-2" 
+                                          id="companionInput" 
+                                          rows="4" 
+                                          placeholder="Paste your GHunt Companion extension data here (base64 format)..."></textarea>
+                                
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Get authentication data from the <a href="https://github.com/mxrch/ghunt_companion" target="_blank" class="text-decoration-none">GHunt Companion extension</a>
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="authenticateFromMainForm()">
+                                        <i class="bi bi-key"></i> Authenticate
+                                    </button>
+                                </div>
+                                
+                                <!-- Authentication Progress -->
+                                <div id="authProgress" class="mt-2 d-none">
+                                    <div class="alert alert-info mb-0">
+                                        <div class="d-flex align-items-center">
+                                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                                <span class="visually-hidden">Authenticating...</span>
+                                            </div>
+                                            <span>Setting up GHunt authentication...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Authentication Result -->
+                                <div id="authResult" class="mt-2"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Search Options -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="forceRedoCheck">
+                                    <label class="form-check-label" for="forceRedoCheck">
+                                        <small>Force redo (ignore duplicate detection)</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <div id="alertContainer"></div>
+                </div>
+            </div>
+            
+            <!-- Help Information Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6><i class="bi bi-question-circle"></i> How to Use GHunt</h6>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="helpAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cookieHelp">
+                                    <i class="bi bi-cookie me-2"></i> Getting Google Cookies
+                                </button>
+                            </h2>
+                            <div id="cookieHelp" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <ol>
+                                        <li>Install the GHunt Companion Firefox extension</li>
+                                        <li>Login to your Google account in the browser</li>
+                                        <li>Click the GHunt extension icon</li>
+                                        <li>Copy the generated cookies (base64 format supported)</li>
+                                        <li>Paste them in the cookies field above</li>
+                                    </ol>
+                                    <div class="alert alert-warning mt-2">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        <strong>Note:</strong> Cookies expire periodically and need to be refreshed. Base64 encoded cookies are automatically decoded.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#searchTypeHelp">
+                                    <i class="bi bi-search me-2"></i> Search Types
+                                </button>
+                            </h2>
+                            <div id="searchTypeHelp" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li><strong>Email:</strong> Investigate a Gmail address or Google account email</li>
+                                        <li><strong>Gaia ID:</strong> Search using a Google internal user ID</li>
+                                        <li><strong>Drive:</strong> Analyze Google Drive files or folders using their ID</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#privacyHelp">
+                                    <i class="bi bi-shield-check me-2"></i> Privacy & Security
+                                </button>
+                            </h2>
+                            <div id="privacyHelp" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li>All searches are logged for investigation tracking</li>
+                                        <li>Use Tor proxy for enhanced anonymity</li>
+                                        <li>Cookies are processed locally and not stored permanently</li>
+                                        <li>Respect rate limits to avoid detection</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <!-- Results Container -->
+            <div class="card" id="resultsContainer" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-file-earmark-text"></i> Investigation Results</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" id="downloadJson" disabled>
+                            <i class="bi bi-download"></i> JSON
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" id="downloadPdf" disabled>
+                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="resultsList"></div>
+                    <div id="summaryStats" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h6>About GHunt</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>What it does:</strong> GHunt investigates Google accounts, Gaia IDs, and Google Drive files to gather comprehensive OSINT information.</p>
+                <p class="mb-2"><strong>Current Status:</strong> <span class="badge bg-success">Fully Integrated</span> - Complete GHunt v2 authentication and API integration.</p>
+                <p class="mb-2"><strong>How it works:</strong> Validates your cookies, automatically generates OSIDs for Google services, and uses the full GHunt v2 API for investigations.</p>
+                <p class="mb-2"><strong>Features:</strong> Profile data extraction, account verification, service associations, and metadata analysis.</p>
+                <p class="mb-0"><strong>Requirements:</strong> Valid Google cookies from the official GHunt Companion browser extension.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.loading-spinner {
+    display: none;
+}
+
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.search-type-hint {
+    font-size: 0.85em;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.result-item {
+    border: 1px solid #e9ecef;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #f8f9fa;
+}
+
+[data-theme="dark"] .result-item {
+    background-color: #343a40;
+    border-color: #495057;
+}
+
+.result-header {
+    font-weight: bold;
+    color: #0d6efd;
+    margin-bottom: 0.5rem;
+}
+
+.result-content {
+    font-family: monospace;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+}
+
+.cookie-input {
+    min-height: 100px;
+    font-family: monospace;
+    font-size: 0.85em;
+}
+</style>
+
+<script>
+let allResults = [];
+let currentSearchId = null;
+
+// Utility function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Search type configurations
+const searchTypeConfig = {
+    email: {
+        label: 'Email Address',
+        placeholder: 'Enter Gmail address (e.g., user@gmail.com)',
+        help: 'Enter the Gmail address or Google account email you want to investigate',
+        pattern: ''
+    },
+    gaia: {
+        label: 'Google Gaia ID',
+        placeholder: 'Enter Gaia ID (e.g., 123456789012345678901)',
+        help: 'Enter the Google Gaia ID (long numeric identifier for Google accounts)',
+        pattern: '^[0-9]{18,21}$'
+    },
+    drive: {
+        label: 'Google Drive File/Folder ID',
+        placeholder: 'Enter Drive file/folder ID (e.g., 1ABC123def...)',
+        help: 'Enter Google Drive file or folder ID (extract from share URL)',
+        pattern: '^[a-zA-Z0-9_-]{28,}$'
+    }
+};
+
+// Update input field based on search type
+document.getElementById('searchType').addEventListener('change', function() {
+    const searchType = this.value;
+    const targetInput = document.getElementById('targetInput');
+    const targetLabel = document.getElementById('targetLabel');
+    const targetHelp = document.getElementById('targetHelp');
+    
+    if (searchType && searchTypeConfig[searchType]) {
+        const config = searchTypeConfig[searchType];
+        targetLabel.textContent = config.label;
+        targetInput.placeholder = config.placeholder;
+        targetHelp.textContent = config.help;
+        // Remove any client-side validation - server will handle validation
+        targetInput.removeAttribute('pattern');
+        targetInput.removeAttribute('type');
+        targetInput.setAttribute('type', 'text');
+    } else {
+        targetLabel.textContent = 'Target';
+        targetInput.placeholder = 'Enter target for investigation';
+        targetHelp.textContent = 'Select a search type to see specific instructions';
+        targetInput.removeAttribute('pattern');
+        targetInput.removeAttribute('type');
+        targetInput.setAttribute('type', 'text');
+    }
+    
+    // Clear previous value when switching types
+    targetInput.value = '';
+});
+
+document.getElementById('ghuntForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const searchType = document.getElementById('searchType').value;
+    const target = document.getElementById('targetInput').value;
+    // Note: GHunt now uses stored authentication tokens instead of cookies
+    const searchButton = document.getElementById('searchButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const alertContainer = document.getElementById('alertContainer');
+    const resultsContainer = document.getElementById('resultsContainer');
+    
+    // Show loading state
+    searchButton.disabled = true;
+    buttonText.textContent = 'Investigating...';
+    loadingSpinner.style.display = 'inline-block';
+    alertContainer.innerHTML = '';
+    resultsContainer.style.display = 'none';
+    
+    try {
+        // Get selected investigation ID
+        const investigationId = document.getElementById('investigationSelect').value || null;
+        
+        // Check if investigation is selected
+        if (!investigationId) {
+            throw new Error('Please select an investigation to link this search to.');
+        }
+        
+        // Validate inputs
+        if (!searchType) {
+            throw new Error('Please select a search type.');
+        }
+        
+        if (!target) {
+            throw new Error('Please enter a target for investigation.');
+        }
+        
+        // Cookies are now optional if stored in profile
+        // if (!cookies) {
+        //     throw new Error('Please provide Google cookies from the browser extension.');
+        // }
+        
+        // Queue the search task
+        const queueResponse = await fetch('/api/search/queue', getTorFetchOptions({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            },
+            body: JSON.stringify({ 
+                tool_name: 'ghunt',
+                query: target,
+                investigation_id: investigationId,
+                search_params: {
+                    search_type: searchType
+                },
+                force_redo: document.getElementById('forceRedoCheck').checked
+            })
+        }));
+        
+        const queueData = await queueResponse.json();
+        
+        if (!queueResponse.ok) {
+            throw new Error(queueData.error || 'Failed to queue search');
+        }
+        
+        if (queueData.duplicate) {
+            alertContainer.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Search already exists. <a href="/searches/${queueData.search_id}" class="alert-link">View results</a>
+                    <div class="mt-2">
+                        <small>Use "Force redo" option to run the search again.</small>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        currentSearchId = queueData.search_id;
+        pollCount = 0; // Reset poll counter for new search
+        
+        alertContainer.innerHTML = `
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle me-2"></i>
+                GHunt investigation queued successfully! Search ID: ${currentSearchId}
+            </div>
+        `;
+        
+        // Start polling for results
+        pollForResults(currentSearchId);
+        
+    } catch (error) {
+        alertContainer.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Error: ${error.message}
+            </div>
+        `;
+    } finally {
+        // Reset button state
+        searchButton.disabled = false;
+        buttonText.textContent = 'Investigate';
+        loadingSpinner.style.display = 'none';
+    }
+});
+
+let pollCount = 0;
+const maxPolls = 60; // Maximum 3 minutes of polling (60 * 3 seconds)
+
+async function pollForResults(searchId) {
+    try {
+        pollCount++;
+        console.log(`Polling for results (attempt ${pollCount}/${maxPolls}), search ID:`, searchId); // Debug log
+        
+        if (pollCount > maxPolls) {
+            console.error('Polling timeout reached, stopping polling'); // Debug log
+            document.getElementById('alertContainer').innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Search is taking longer than expected. Please check the search results page.
+                </div>
+            `;
+            return;
+        }
+        
+        const response = await fetch(`/api/search/${searchId}/status`);
+        console.log('Status response status:', response.status); // Debug log
+        const data = await response.json();
+        console.log('Status data received:', data); // Debug log
+        
+        if (data.status === 'COMPLETED' || data.status === 'completed') {
+            // Update status to show completion
+            document.getElementById('alertContainer').innerHTML = `
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Investigation completed! Loading results...
+                </div>
+            `;
+            
+            // Get results
+            console.log('Fetching results for search ID:', searchId); // Debug log
+            const resultsResponse = await fetch(`/api/search/${searchId}/results`);
+            console.log('Results response status:', resultsResponse.status); // Debug log
+            console.log('Results response headers:', resultsResponse.headers); // Debug log
+            
+            const resultsData = await resultsResponse.json();
+            
+            console.log('Results data received:', resultsData); // Debug log
+            console.log('Results response ok:', resultsResponse.ok); // Debug log
+            console.log('Results array:', resultsData.results); // Debug log
+            console.log('Results array type:', typeof resultsData.results); // Debug log
+            console.log('Results array length:', resultsData.results ? resultsData.results.length : 'undefined'); // Debug log
+            
+            if (resultsResponse.ok) {
+                console.log('About to call displayResults with:', resultsData.results); // Debug log
+                try {
+                    displayResults(resultsData.results);
+                    console.log('displayResults call completed'); // Debug log
+                } catch (error) {
+                    console.error('Error in displayResults:', error); // Debug log
+                    document.getElementById('alertContainer').innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Error displaying results: ${error.message}
+                        </div>
+                    `;
+                }
+                
+                // Update alert to show success with results
+                document.getElementById('alertContainer').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle me-2"></i>
+                        Investigation completed successfully! Results are displayed below.
+                    </div>
+                `;
+            } else {
+                console.error('Results response not ok:', resultsResponse.status); // Debug log
+                console.error('Results error data:', resultsData); // Debug log
+                throw new Error(resultsData.error || `Failed to get results (HTTP ${resultsResponse.status})`);
+            }
+        } else if (data.status === 'FAILED' || data.status === 'failed') {
+            // Show the actual error from the search
+            document.getElementById('alertContainer').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Investigation failed: ${data.error_message || data.error || 'Unknown error occurred'}
+                </div>
+            `;
+            
+            // For failed searches, still try to show the error details
+            try {
+                const resultsResponse = await fetch(`/api/search/${searchId}/results`);
+                if (resultsResponse.ok) {
+                    const resultsData = await resultsResponse.json();
+                    console.log('Failed search results:', resultsData); // Debug log
+                    if (resultsData.results && resultsData.results.length > 0) {
+                        displayResults(resultsData.results);
+                    }
+                }
+            } catch (e) {
+                console.log('Could not fetch error details:', e);
+            }
+            return; // Don't throw error, just stop polling
+        } else {
+            // Still running, poll again
+            console.log('Search still running, status:', data.status, 'polling again in 3 seconds'); // Debug log
+            setTimeout(() => pollForResults(searchId), 3000);
+            
+            // Update status
+            document.getElementById('alertContainer').innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-clock me-2"></i>
+                    Search in progress... Status: ${data.status}
+                    <div class="progress mt-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 50%"></div>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('alertContainer').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Error getting results: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayResults(results) {
+    console.log('displayResults called with:', results); // Debug log
+    console.log('Results type:', typeof results); // Debug log
+    console.log('Results is array:', Array.isArray(results)); // Debug log
+    
+    allResults = results;
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsList = document.getElementById('resultsList');
+    const summaryStats = document.getElementById('summaryStats');
+    
+    console.log('DOM elements found:', {
+        resultsContainer: !!resultsContainer,
+        resultsList: !!resultsList,
+        summaryStats: !!summaryStats
+    }); // Debug log
+    
+    if (!resultsContainer) {
+        console.error('Results container not found! Looking for #resultsContainer');
+        // Try to find any element that might be the results container
+        const allContainers = document.querySelectorAll('[id*="result"]');
+        console.log('Found containers with "result" in ID:', allContainers);
+        return;
+    }
+    
+    if (!results || results.length === 0) {
+        console.log('No results to display'); // Debug log
+        resultsList.innerHTML = '<p class="text-muted">No results found.</p>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+    
+    console.log('Processing', results.length, 'results'); // Debug log
+    
+    let html = '';
+    
+    results.forEach((result, index) => {
+        const isSuccess = result.success;
+        const statusClass = isSuccess ? 'text-success' : 'text-danger';
+        const statusIcon = isSuccess ? 'bi-check-circle' : 'bi-x-circle';
+        
+        html += `
+            <div class="result-item">
+                <div class="result-header d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="bi ${statusIcon} ${statusClass} me-2"></i>
+                        ${result.search_type?.toUpperCase() || 'GHUNT'} Investigation
+                    </span>
+                    <span class="badge ${isSuccess ? 'bg-success' : 'bg-danger'}">
+                        ${isSuccess ? 'Success' : 'Failed'}
+                    </span>
+                </div>
+                <div class="result-content">
+                    <strong>Target:</strong> ${result.target || 'Unknown'}
+                    <br>
+        `;
+        
+        if (isSuccess && result.data) {
+            // Parse and display the data in a user-friendly format
+            if (result.data.extracted_info) {
+                // Display parsed information in a structured way
+                const info = result.data.extracted_info;
+                html += `<div class="mt-2">`;
+                for (const [key, value] of Object.entries(info)) {
+                    if (value) {
+                        const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        html += `
+                            <div class="row mb-1">
+                                <div class="col-4"><strong>${displayKey}:</strong></div>
+                                <div class="col-8">${escapeHtml(String(value))}</div>
+                            </div>
+                        `;
+                    }
+                }
+                html += `</div>`;
+            } else if (result.data.raw_output) {
+                // Display raw output in a formatted way
+                html += `
+                    <div class="mt-2">
+                        <strong>Investigation Results:</strong>
+                        <div class="bg-light p-3 rounded mt-2" style="max-height: 400px; overflow-y: auto;">
+                            <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.9em;">${escapeHtml(result.data.raw_output)}</pre>
+                        </div>
+                    </div>
+                `;
+            } else if (typeof result.data === 'object') {
+                // Parse GHunt JSON output for better display
+                html += `<div class="mt-2">`;
+                
+                // Enhanced GHunt result parser
+                const data = result.data;
+                const parsedData = parseGHuntResults(data);
+                
+                if (parsedData.hasData) {
+                    html += parsedData.html;
+                } else {
+                    // Fallback for unrecognized data structures
+                    if (data.name) {
+                        html += `<div class="row mb-1"><div class="col-4"><strong>Name:</strong></div><div class="col-8">${escapeHtml(data.name)}</div></div>`;
+                    }
+                    if (data.email) {
+                        html += `<div class="row mb-1"><div class="col-4"><strong>Email:</strong></div><div class="col-8">${escapeHtml(data.email)}</div></div>`;
+                    }
+                    if (data.gaia_id) {
+                        html += `<div class="row mb-1"><div class="col-4"><strong>Gaia ID:</strong></div><div class="col-8">${escapeHtml(data.gaia_id)}</div></div>`;
+                    }
+                }
+                
+                // Show raw JSON if no structured data found and it's a successful search
+                const hasStructuredData = data.status === 'success' || data.status === 'no_data' || data.name || data.email || data.gaia_id;
+                
+                if (!hasStructuredData) {
+                    html += `
+                        <details class="mt-2">
+                            <summary><strong>Raw Investigation Data</strong> (click to expand)</summary>
+                            <div class="bg-light p-3 rounded mt-2" style="max-height: 300px; overflow-y: auto;">
+                                <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.85em;">${JSON.stringify(result.data, null, 2)}</pre>
+                            </div>
+                        </details>
+                    `;
+                }
+                
+                html += `</div>`;
+            } else {
+                // Fallback for other data types
+                html += `<strong>Data:</strong><br><pre style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${JSON.stringify(result.data, null, 2)}</pre>`;
+            }
+        } else if (result.error) {
+            html += `<div class="alert alert-danger mt-2"><strong>Error:</strong> ${escapeHtml(result.error)}</div>`;
+        }
+        
+        if (result.metadata) {
+            html += `<br><small class="text-muted">
+                Timestamp: ${new Date(result.metadata.timestamp).toLocaleString()} | 
+                Tor: ${result.metadata.tor_used ? 'Yes' : 'No'}
+            </small>`;
+        }
+        
+        html += `</div></div>`;
+    });
+    
+    resultsList.innerHTML = html;
+    
+    // Update summary
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+    
+    summaryStats.innerHTML = `
+        <div class="alert alert-info">
+            <strong>Investigation Summary:</strong> ${successCount}/${totalCount} successful results
+            <br><small>Search completed at ${new Date().toLocaleString()}</small>
+        </div>
+    `;
+    
+    // Enable download buttons
+    document.getElementById('downloadJson').disabled = false;
+    document.getElementById('downloadPdf').disabled = false;
+    
+    resultsContainer.style.display = 'block';
+    
+    console.log('Results displayed successfully, container is now visible'); // Debug log
+    console.log('Results container display style:', resultsContainer.style.display); // Debug log
+    console.log('Results container offsetHeight:', resultsContainer.offsetHeight); // Debug log
+    console.log('Results list innerHTML length:', resultsList.innerHTML.length); // Debug log
+}
+
+// New Search button functionality
+document.getElementById('newSearchButton').addEventListener('click', function() {
+    // Clear form inputs but KEEP cookies
+    document.getElementById('targetInput').value = '';
+    document.getElementById('searchType').value = '';
+    // DO NOT clear cookies: document.getElementById('cookiesInput').value = '';
+    
+    // Keep investigation and Tor settings, but reset other elements
+    document.getElementById('forceRedoCheck').checked = false;
+    
+    // Clear results and alerts
+    document.getElementById('alertContainer').innerHTML = '';
+    document.getElementById('resultsContainer').style.display = 'none';
+    
+    // Reset button state
+    const searchButton = document.getElementById('searchButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    searchButton.disabled = false;
+    buttonText.textContent = 'Investigate';
+    loadingSpinner.style.display = 'none';
+    
+    // Reset target input configuration
+    document.getElementById('targetLabel').textContent = 'Target';
+    document.getElementById('targetInput').placeholder = 'Enter target for investigation';
+    document.getElementById('targetHelp').textContent = 'Select a search type to see specific instructions';
+    
+    // Focus on search type selection
+    document.getElementById('searchType').focus();
+});
+
+// Enhanced GHunt result parser
+function parseGHuntResults(data) {
+    const result = {
+        hasData: false,
+        html: ''
+    };
+    
+    let html = '';
+    let foundData = false;
+    
+    // Helper function to safely get nested properties
+    function safeGet(obj, path, defaultValue = null) {
+        return path.split('.').reduce((current, key) => {
+            return (current && current[key] !== undefined) ? current[key] : defaultValue;
+        }, obj);
+    }
+    
+    // Helper function to format display names
+    function formatKey(key) {
+        return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
+    // Helper function to render a field
+    function renderField(label, value, isUrl = false) {
+        if (!value) return '';
+        foundData = true;
+        
+        const displayValue = isUrl ? 
+            `<a href="${escapeHtml(value)}" target="_blank" class="text-decoration-none">${escapeHtml(value)}</a>` :
+            escapeHtml(String(value));
+            
+        return `
+            <div class="row mb-1">
+                <div class="col-4"><strong>${label}:</strong></div>
+                <div class="col-8">${displayValue}</div>
+            </div>
+        `;
+    }
+    
+    try {
+        // Handle different GHunt response structures
+        
+        // PRIORITY: Extract display_name and person_id from actual GHunt structure
+        let foundDisplayName = null;
+        let foundPersonId = null;
+        
+        console.log('Checking for items array in data:', !!data.items); // Debug log
+        console.log('Full data structure:', data); // Debug log
+        
+        // Check for PROFILE_CONTAINER structure (actual GHunt format)
+        if (data.PROFILE_CONTAINER) {
+            console.log('Found PROFILE_CONTAINER'); // Debug log
+            
+            // Extract person_id from profile
+            if (data.PROFILE_CONTAINER.profile && data.PROFILE_CONTAINER.profile.personId) {
+                foundPersonId = data.PROFILE_CONTAINER.profile.personId;
+                console.log('Found person_id in PROFILE_CONTAINER.profile:', foundPersonId); // Debug log
+            }
+            
+            // Extract display_name from profile or calendar events
+            if (data.PROFILE_CONTAINER.profile && data.PROFILE_CONTAINER.profile.display_name) {
+                foundDisplayName = data.PROFILE_CONTAINER.profile.display_name;
+                console.log('Found display_name in PROFILE_CONTAINER.profile:', foundDisplayName); // Debug log
+            }
+            
+            // Check calendar events for creator display_name
+            if (!foundDisplayName && data.PROFILE_CONTAINER.calendar && data.PROFILE_CONTAINER.calendar.events && data.PROFILE_CONTAINER.calendar.events.items) {
+                const events = data.PROFILE_CONTAINER.calendar.events.items;
+                if (Array.isArray(events)) {
+                    console.log('Checking calendar events for display_name, events count:', events.length); // Debug log
+                    events.forEach((event, index) => {
+                        console.log(`Calendar event ${index}:`, event); // Debug log
+                        if (event.creator && event.creator.display_name && !foundDisplayName) {
+                            foundDisplayName = event.creator.display_name;
+                            console.log('Found display_name in calendar event creator:', foundDisplayName); // Debug log
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Fallback: Check for older structure
+        if (!foundDisplayName || !foundPersonId) {
+            if (data.items && Array.isArray(data.items)) {
+                console.log('Found items array with length:', data.items.length); // Debug log
+                data.items.forEach((item, index) => {
+                    console.log(`Item ${index}:`, item); // Debug log
+                    if (item.creator && item.creator.display_name && !foundDisplayName) {
+                        foundDisplayName = item.creator.display_name;
+                        console.log('Found display_name in creator:', foundDisplayName); // Debug log
+                    }
+                    if (item.creator && item.creator.person_id && !foundPersonId) {
+                        foundPersonId = item.creator.person_id;
+                        console.log('Found person_id in creator:', foundPersonId); // Debug log
+                    }
+                });
+            }
+        }
+        
+        // Display priority information at the top
+        if (foundDisplayName || foundPersonId) {
+            html += '<div class="mt-2 mb-2"><strong class="text-success">🎯 Key Identity Information:</strong></div>';
+            if (foundDisplayName) {
+                html += renderField('👤 Display Name', foundDisplayName);
+            }
+            if (foundPersonId) {
+                html += renderField('🆔 Person ID', foundPersonId);
+            }
+        }
+        
+        // Check for main profile information
+        if (data.name || data.display_name || data.email || data.gaia_id) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Profile Information:</strong></div>';
+            html += renderField('Name', data.name);
+            html += renderField('Display Name', data.display_name);
+            html += renderField('Email', data.email);
+            html += renderField('Gaia ID', data.gaia_id);
+            html += renderField('Customer ID', data.customer_id || data.customerId);
+        }
+        
+        // Extract emails from nested structures
+        if (data.emails && Array.isArray(data.emails)) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Email Addresses:</strong></div>';
+            data.emails.forEach((emailData, index) => {
+                if (typeof emailData === 'object' && emailData.contact && emailData.contact.value) {
+                    html += renderField(`Email ${index + 1}`, emailData.contact.value);
+                    html += renderField(`Email ${index + 1} Type`, emailData.contact.type || emailData.type);
+                } else if (typeof emailData === 'string') {
+                    html += renderField(`Email ${index + 1}`, emailData);
+                } else if (emailData.value) {
+                    html += renderField(`Email ${index + 1}`, emailData.value);
+                    html += renderField(`Email ${index + 1} Type`, emailData.type);
+                }
+            });
+        }
+        
+        // Check for contact information with nested email structures
+        if (data.contact) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Contact Information:</strong></div>';
+            if (data.contact.emails && Array.isArray(data.contact.emails)) {
+                data.contact.emails.forEach((emailData, index) => {
+                    if (emailData.value) {
+                        html += renderField(`Contact Email ${index + 1}`, emailData.value);
+                        html += renderField(`Contact Email ${index + 1} Type`, emailData.type);
+                    }
+                });
+            }
+            if (data.contact.value) {
+                html += renderField('Contact Value', data.contact.value);
+            }
+        }
+        
+        // Check for YouTube data (comprehensive)
+        if (data.youtube) {
+            const yt = data.youtube;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">YouTube Information:</strong></div>';
+            html += renderField('Channel Name', yt.name || yt.channel_name || yt.title);
+            html += renderField('Channel Handle', yt.handle || yt.username);
+            html += renderField('Channel ID', yt.id || yt.channel_id);
+            html += renderField('Channel URL', yt.url || yt.channel_url, true);
+            html += renderField('Custom URL', yt.custom_url, true);
+            html += renderField('Description', yt.description || yt.about);
+            html += renderField('Keywords', yt.keywords ? yt.keywords.join(', ') : null);
+            html += renderField('Country', yt.country || yt.location);
+            html += renderField('Language', yt.language || yt.default_language);
+            html += renderField('Subscriber Count', yt.subscriber_count || yt.subscribers);
+            html += renderField('Video Count', yt.video_count || yt.total_videos);
+            html += renderField('View Count', yt.view_count || yt.total_views);
+            html += renderField('Creation Date', yt.creation_date || yt.created_at || yt.published_at);
+            html += renderField('Last Upload', yt.last_upload || yt.latest_video_date);
+            html += renderField('Profile Photo', yt.profile_photo_url || yt.avatar || yt.thumbnail, true);
+            html += renderField('Banner Image', yt.banner_url || yt.banner_image, true);
+            html += renderField('Verified', yt.verified ? 'Yes' : 'No');
+            html += renderField('Business Email', yt.business_email);
+            html += renderField('External Links', yt.external_links ? yt.external_links.join(', ') : null);
+            html += renderField('Social Links', yt.social_links ? JSON.stringify(yt.social_links) : null);
+            
+            // Recent videos
+            if (yt.recent_videos && Array.isArray(yt.recent_videos)) {
+                html += '<div class="mt-2 mb-1"><strong class="text-info">Recent Videos:</strong></div>';
+                yt.recent_videos.slice(0, 10).forEach((video, index) => {
+                    html += `<div class="border rounded p-2 mb-2 bg-light">`;
+                    html += renderField(`Video ${index + 1} Title`, video.title);
+                    html += renderField(`Video ${index + 1} URL`, video.url, true);
+                    html += renderField(`Video ${index + 1} Description`, video.description);
+                    html += renderField(`Video ${index + 1} Views`, video.views || video.view_count);
+                    html += renderField(`Video ${index + 1} Duration`, video.duration);
+                    html += renderField(`Video ${index + 1} Upload Date`, video.upload_date || video.published_at);
+                    html += renderField(`Video ${index + 1} Likes`, video.likes || video.like_count);
+                    html += renderField(`Video ${index + 1} Comments`, video.comments || video.comment_count);
+                    html += `</div>`;
+                });
+            }
+        }
+        
+        // Check for Google+ / Profile data (comprehensive)
+        if (data.gplus || data.profile) {
+            const profile = data.gplus || data.profile;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Profile Information:</strong></div>';
+            html += renderField('Display Name', profile.name || profile.display_name);
+            html += renderField('First Name', profile.first_name || profile.given_name);
+            html += renderField('Last Name', profile.last_name || profile.family_name);
+            html += renderField('Person ID', profile.person_id || profile.id);
+            html += renderField('Profile URL', profile.url, true);
+            html += renderField('User Type', profile.user_type || profile.type);
+            html += renderField('Account Type', profile.account_type);
+            html += renderField('Location', profile.location);
+            html += renderField('Current Location', profile.current_location);
+            html += renderField('Occupation', profile.occupation);
+            html += renderField('Job Title', profile.job_title || profile.title);
+            html += renderField('Company', profile.company || profile.organization);
+            html += renderField('School', profile.school || profile.education);
+            html += renderField('Bio/About', profile.bio || profile.about || profile.description);
+            html += renderField('Tagline', profile.tagline);
+            html += renderField('Introduction', profile.introduction);
+            html += renderField('Bragging Rights', profile.bragging_rights);
+            html += renderField('Relationship Status', profile.relationship_status);
+            html += renderField('Gender', profile.gender);
+            html += renderField('Birthday', profile.birthday || profile.birth_date);
+            html += renderField('Website', profile.website, true);
+            html += renderField('Profile Photo', profile.photo_url || profile.profile_photo, true);
+            html += renderField('Cover Photo', profile.cover_photo_url || profile.cover_photo, true);
+            html += renderField('Verified', profile.verified ? 'Yes' : 'No');
+            html += renderField('Profile Created', profile.created_date || profile.join_date);
+            html += renderField('Last Updated', profile.updated_date || profile.last_modified);
+            html += renderField('Followers Count', profile.followers_count || profile.followers);
+            html += renderField('Following Count', profile.following_count || profile.following);
+            html += renderField('Posts Count', profile.posts_count || profile.post_count);
+            html += renderField('Plus Ones Count', profile.plus_ones_count);
+            html += renderField('Views Count', profile.views_count || profile.profile_views);
+            
+            // Contact information (comprehensive email extraction)
+            if (profile.contact_info || profile.emails || profile.phones || profile.contact) {
+                html += '<div class="mt-2 mb-1"><strong class="text-info">Profile Contact Information:</strong></div>';
+                
+                // Handle different email structures
+                if (profile.emails && Array.isArray(profile.emails)) {
+                    profile.emails.forEach((emailData, index) => {
+                        if (typeof emailData === 'object') {
+                            if (emailData.contact && emailData.contact.value) {
+                                html += renderField(`Profile Email ${index + 1}`, emailData.contact.value);
+                                html += renderField(`Profile Email ${index + 1} Type`, emailData.contact.type || emailData.type);
+                            } else if (emailData.value) {
+                                html += renderField(`Profile Email ${index + 1}`, emailData.value);
+                                html += renderField(`Profile Email ${index + 1} Type`, emailData.type);
+                            }
+                        } else if (typeof emailData === 'string') {
+                            html += renderField(`Profile Email ${index + 1}`, emailData);
+                        }
+                    });
+                }
+                
+                // Handle contact object with nested emails
+                if (profile.contact) {
+                    if (profile.contact.emails && Array.isArray(profile.contact.emails)) {
+                        profile.contact.emails.forEach((emailData, index) => {
+                            if (emailData.value) {
+                                html += renderField(`Contact Email ${index + 1}`, emailData.value);
+                                html += renderField(`Contact Email ${index + 1} Type`, emailData.type);
+                            }
+                        });
+                    }
+                    if (profile.contact.value) {
+                        html += renderField('Contact Value', profile.contact.value);
+                    }
+                }
+                
+                // Handle phones
+                if (profile.phones && Array.isArray(profile.phones)) {
+                    profile.phones.forEach((phoneData, index) => {
+                        if (typeof phoneData === 'object') {
+                            if (phoneData.contact && phoneData.contact.value) {
+                                html += renderField(`Phone ${index + 1}`, phoneData.contact.value);
+                                html += renderField(`Phone ${index + 1} Type`, phoneData.contact.type || phoneData.type);
+                            } else if (phoneData.value) {
+                                html += renderField(`Phone ${index + 1}`, phoneData.value);
+                                html += renderField(`Phone ${index + 1} Type`, phoneData.type);
+                            }
+                        } else if (typeof phoneData === 'string') {
+                            html += renderField(`Phone ${index + 1}`, phoneData);
+                        }
+                    });
+                }
+                
+                // Handle general contact_info
+                if (profile.contact_info) {
+                    Object.entries(profile.contact_info).forEach(([key, value]) => {
+                        if (typeof value === 'object' && value.contact && value.contact.value) {
+                            html += renderField(formatKey(key), value.contact.value);
+                            html += renderField(formatKey(key) + ' Type', value.contact.type || value.type);
+                        } else {
+                            html += renderField(formatKey(key), value);
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Check for photos (comprehensive)
+        if (data.photos && Array.isArray(data.photos) && data.photos.length > 0) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Photos:</strong></div>';
+            data.photos.slice(0, 15).forEach((photo, index) => {
+                if (photo.url || photo.src || photo.link) {
+                    const photoUrl = photo.url || photo.src || photo.link;
+                    html += `<div class="border rounded p-2 mb-2 bg-light">`;
+                    html += renderField(`Photo ${index + 1} URL`, photoUrl, true);
+                    html += renderField(`Photo ${index + 1} Title`, photo.title || photo.caption);
+                    html += renderField(`Photo ${index + 1} Description`, photo.description || photo.alt_text);
+                    html += renderField(`Photo ${index + 1} Date`, photo.date || photo.created_date || photo.timestamp);
+                    html += renderField(`Photo ${index + 1} Location`, photo.location || photo.geo_location);
+                    html += renderField(`Photo ${index + 1} Album`, photo.album || photo.collection);
+                    html += renderField(`Photo ${index + 1} Size`, photo.size || photo.dimensions);
+                    html += renderField(`Photo ${index + 1} Views`, photo.views || photo.view_count);
+                    html += renderField(`Photo ${index + 1} Likes`, photo.likes || photo.like_count);
+                    html += renderField(`Photo ${index + 1} Comments`, photo.comments || photo.comment_count);
+                    html += `</div>`;
+                }
+            });
+            if (data.photos.length > 15) {
+                html += renderField('Additional Photos', `... and ${data.photos.length - 15} more photos`);
+            }
+        }
+        
+        // Check for reviews/maps data
+        if (data.reviews || data.maps) {
+            const reviews = data.reviews || data.maps;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Reviews & Maps:</strong></div>';
+            if (reviews.total_reviews) {
+                html += renderField('Total Reviews', reviews.total_reviews);
+            }
+            if (reviews.average_rating) {
+                html += renderField('Average Rating', reviews.average_rating);
+            }
+            if (Array.isArray(reviews.recent_reviews)) {
+                reviews.recent_reviews.slice(0, 3).forEach((review, index) => {
+                    html += renderField(`Review ${index + 1}`, `${review.rating || 'N/A'} stars - ${review.text || 'No text'}`);
+                });
+            }
+        }
+        
+        // Check for calendar data (comprehensive)
+        if (data.calendar) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Calendar Information:</strong></div>';
+            html += renderField('Calendar Access', data.calendar.accessible ? 'Yes' : 'No');
+            html += renderField('Calendar URL', data.calendar.url, true);
+            html += renderField('Calendar Name', data.calendar.name);
+            html += renderField('Calendar Description', data.calendar.description);
+            html += renderField('Calendar Location', data.calendar.location);
+            html += renderField('Calendar Timezone', data.calendar.timezone);
+            html += renderField('Calendar Color', data.calendar.color);
+            
+            // Calendar events
+            if (data.calendar.events && Array.isArray(data.calendar.events)) {
+                html += '<div class="mt-2 mb-1"><strong class="text-info">Recent Calendar Events:</strong></div>';
+                data.calendar.events.slice(0, 10).forEach((event, index) => {
+                    html += `<div class="border rounded p-2 mb-2 bg-light">`;
+                    html += renderField(`Event ${index + 1} Title`, event.title || event.summary);
+                    html += renderField(`Event ${index + 1} Description`, event.description);
+                    html += renderField(`Event ${index + 1} Location`, event.location);
+                    html += renderField(`Event ${index + 1} Start`, event.start || event.start_time);
+                    html += renderField(`Event ${index + 1} End`, event.end || event.end_time);
+                    html += renderField(`Event ${index + 1} Creator`, event.creator);
+                    html += renderField(`Event ${index + 1} Attendees`, event.attendees ? event.attendees.join(', ') : null);
+                    html += `</div>`;
+                });
+                if (data.calendar.events.length > 10) {
+                    html += renderField('Additional Events', `... and ${data.calendar.events.length - 10} more events`);
+                }
+            }
+        }
+        
+        // Check for drive data
+        if (data.drive) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Drive Information:</strong></div>';
+            html += renderField('Drive ID', data.drive.id);
+            html += renderField('Drive Name', data.drive.name);
+            html += renderField('Drive URL', data.drive.url, true);
+            html += renderField('File Count', data.drive.file_count);
+            html += renderField('Owner', data.drive.owner);
+        }
+        
+        // Check for contacts/hangouts
+        if (data.hangouts || data.contacts) {
+            const contacts = data.hangouts || data.contacts;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Social Connections:</strong></div>';
+            if (contacts.contact_count) {
+                html += renderField('Contact Count', contacts.contact_count);
+            }
+            if (Array.isArray(contacts.recent_contacts)) {
+                contacts.recent_contacts.slice(0, 3).forEach((contact, index) => {
+                    html += renderField(`Contact ${index + 1}`, contact.name || contact.email);
+                });
+            }
+        }
+        
+        // Check for activity/location data
+        if (data.activity || data.location) {
+            const activity = data.activity || data.location;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Activity Information:</strong></div>';
+            html += renderField('Last Activity', activity.last_seen);
+            html += renderField('Location History', activity.location_history ? 'Available' : 'Not Available');
+            html += renderField('Timeline Access', activity.timeline_accessible ? 'Yes' : 'No');
+        }
+        
+        // Check for any URLs in the data
+        const allUrls = [];
+        function extractUrls(obj, path = '') {
+            if (typeof obj === 'string' && (obj.startsWith('http') || obj.includes('google.com'))) {
+                allUrls.push({ path, url: obj });
+            } else if (typeof obj === 'object' && obj !== null) {
+                Object.entries(obj).forEach(([key, value]) => {
+                    extractUrls(value, path ? `${path}.${key}` : key);
+                });
+            }
+        }
+        
+        extractUrls(data);
+        if (allUrls.length > 0) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Related URLs:</strong></div>';
+            allUrls.slice(0, 5).forEach((item, index) => {
+                html += renderField(`URL ${index + 1}`, item.url, true);
+            });
+        }
+        
+        // Comprehensive email extraction from all nested structures
+        const allEmails = [];
+        function extractEmails(obj, path = '') {
+            if (typeof obj === 'string') {
+                // Check if the string looks like an email
+                const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+                const matches = obj.match(emailRegex);
+                if (matches) {
+                    matches.forEach(email => {
+                        if (!allEmails.some(e => e.email === email)) {
+                            allEmails.push({ email, path });
+                        }
+                    });
+                }
+            } else if (typeof obj === 'object' && obj !== null) {
+                Object.entries(obj).forEach(([key, value]) => {
+                    const currentPath = path ? `${path}.${key}` : key;
+                    extractEmails(value, currentPath);
+                });
+            }
+        }
+        
+        extractEmails(data);
+        if (allEmails.length > 0) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">All Email Addresses Found:</strong></div>';
+            allEmails.forEach((emailData, index) => {
+                html += renderField(`Found Email ${index + 1}`, emailData.email);
+                html += renderField(`Found Email ${index + 1} Location`, emailData.path);
+            });
+        }
+        
+        // Comprehensive scan for any additional data fields
+        html += '<div class="mt-2 mb-2"><strong class="text-primary">Additional Data Fields:</strong></div>';
+        
+        function scanObjectForData(obj, prefix = '') {
+            if (typeof obj !== 'object' || obj === null) return;
+            
+            Object.entries(obj).forEach(([key, value]) => {
+                const fieldName = prefix ? `${prefix}.${key}` : key;
+                
+                // Skip already processed sections
+                const skipSections = ['youtube', 'gplus', 'profile', 'photos', 'reviews', 'maps', 
+                                    'calendar', 'drive', 'hangouts', 'contacts', 'activity', 'location'];
+                if (skipSections.includes(key) && !prefix) return;
+                
+                if (value !== null && value !== undefined && value !== '') {
+                    if (typeof value === 'object' && !Array.isArray(value)) {
+                        // Recursively scan nested objects (max 2 levels deep)
+                        if (!prefix || prefix.split('.').length < 2) {
+                            scanObjectForData(value, fieldName);
+                        }
+                    } else if (Array.isArray(value) && value.length > 0) {
+                        // Display arrays up to 5 items
+                        if (value.length <= 5) {
+                            html += renderField(formatKey(fieldName), value.join(', '));
+                        } else {
+                            html += renderField(formatKey(fieldName), `${value.slice(0, 5).join(', ')} ... and ${value.length - 5} more`);
+                        }
+                    } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                        // Only show if we haven't already displayed this field
+                        if (!html.includes(formatKey(fieldName))) {
+                            const isUrl = typeof value === 'string' && (value.startsWith('http') || value.includes('google.com'));
+                            html += renderField(formatKey(fieldName), value, isUrl);
+                        }
+                    }
+                }
+            });
+        }
+        
+        scanObjectForData(data);
+        
+        // If no additional fields were found, don't show the empty section
+        if (!html.includes('<div class="row mb-1">')) {
+            html = html.replace('<div class="mt-2 mb-2"><strong class="text-primary">Additional Data Fields:</strong></div>', '');
+        }
+        
+    } catch (error) {
+        console.error('Error parsing GHunt results:', error);
+        html += '<div class="alert alert-warning">Error parsing results data</div>';
+    }
+    
+    result.hasData = foundData;
+    result.html = html;
+    
+    return result;
+}
+
+// Download functionality
+document.getElementById('downloadJson').addEventListener('click', function() {
+    if (allResults.length === 0) return;
+    
+    const dataStr = JSON.stringify(allResults, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ghunt_results_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+});
+
+document.getElementById('downloadPdf').addEventListener('click', function() {
+    generatePDF();
+});
+
+function generatePDF() {
+    if (allResults.length === 0) return;
+    
+    const target = document.getElementById('targetInput').value;
+    const searchType = document.getElementById('searchType').value;
+    
+    // Generate PDF via API
+    fetch('/api/ghunt/generate-pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            target: target,
+            search_type: searchType,
+            results: allResults,
+            timestamp: new Date().toISOString()
+        })
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ghunt_investigation_${target.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+        link.click();
+        URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+        console.error('PDF generation failed:', error);
+        alert('Failed to generate PDF report');
+    });
+}
+
+// Old cookie management functions removed - now using GHunt Companion authentication
+
+// GHunt Authentication Functions
+function checkAuthStatus() {
+    const statusCard = document.getElementById('authStatusCard');
+    const spinner = document.getElementById('authSpinner');
+    
+    // Show loading state
+    statusCard.className = 'alert alert-info mb-2';
+    statusCard.innerHTML = `
+        <div class="d-flex align-items-center">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span>Checking authentication status...</span>
+        </div>
+    `;
+    
+    fetch('/api/ghunt/auth-status', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+        }
+    })
+    .then(response => {
+        if (response.redirected || response.status === 302) {
+            // User not logged in - show login required message
+            throw new Error('Login required to check authentication status');
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        updateAuthStatusDisplay(data);
+    })
+    .catch(error => {
+        console.error('Auth status check failed:', error);
+        
+        if (error.message.includes('Login required')) {
+            // Show login required message
+            statusCard.className = 'alert alert-warning mb-2';
+            statusCard.innerHTML = `
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Please log in to check authentication status</strong>
+                <br><small>You need to be logged in to view your GHunt authentication status</small>
+            `;
+            // Show auth input section for unauthenticated users
+            updateAuthInputVisibility(false);
+        } else {
+            // For other errors, show default ready state instead of error
+            statusCard.className = 'alert alert-info mb-2';
+            statusCard.innerHTML = `
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Ready for GHunt Authentication</strong>
+                <br><small>Paste your GHunt Companion cookie below and click Authenticate</small>
+            `;
+            updateAuthInputVisibility(false);
+        }
+    });
+}
+
+function updateAuthStatusDisplay(authData) {
+    const statusCard = document.getElementById('authStatusCard');
+    
+    if (authData.auth_valid && authData.user_authenticated && authData.system_authenticated) {
+        statusCard.className = 'alert alert-success mb-2';
+        statusCard.innerHTML = `
+            <i class="bi bi-check-circle me-2"></i>
+            <strong>GHunt authentication active</strong>
+            <br><small>
+                ${authData.user_email ? `Authenticated as: ${authData.user_email}` : 'Authentication verified'}
+                ${authData.auth_updated ? ` | Updated: ${new Date(authData.auth_updated).toLocaleDateString()}` : ''}
+            </small>
+        `;
+        updateAuthInputVisibility(true); // Hide input when authenticated
+    } else if (authData.user_authenticated && !authData.system_authenticated) {
+        statusCard.className = 'alert alert-warning mb-2';
+        statusCard.innerHTML = `
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Authentication tokens stored but system authentication failed</strong>
+            <br><small>Please re-authenticate using the form below</small>
+        `;
+        updateAuthInputVisibility(false); // Show input for re-authentication
+    } else {
+        statusCard.className = 'alert alert-danger mb-2';
+        statusCard.innerHTML = `
+            <i class="bi bi-x-circle me-2"></i>
+            <strong>GHunt authentication required</strong>
+            <br><small>Paste your GHunt Companion extension data below and click "Authenticate"</small>
+        `;
+        updateAuthInputVisibility(false); // Show input for initial authentication
+    }
+}
+
+function updateAuthInputVisibility(isAuthenticated) {
+    const authInputSection = document.getElementById('authInputSection');
+    
+    if (isAuthenticated) {
+        // Hide input section when authenticated
+        authInputSection.style.display = 'none';
+    } else {
+        // Show input section when authentication needed
+        authInputSection.style.display = 'block';
+    }
+}
+
+// Initialize auth form handling
+document.addEventListener('DOMContentLoaded', function() {
+    // Disable all client-side validation on page load
+    const targetInput = document.getElementById('targetInput');
+    if (targetInput) {
+        targetInput.removeAttribute('pattern');
+        targetInput.removeAttribute('type');
+        targetInput.setAttribute('type', 'text');
+        console.log('Disabled client-side validation for target input');
+    }
+    // Check if user is logged in first
+    const csrfToken = document.querySelector('meta[name=csrf-token]');
+    if (!csrfToken || !csrfToken.getAttribute('content')) {
+        // User not logged in - show login required message immediately
+        const statusCard = document.getElementById('authStatusCard');
+        if (statusCard) {
+            statusCard.className = 'alert alert-warning mb-2';
+            statusCard.innerHTML = `
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Login Required</strong>
+                <br><small>You must be logged in to use GHunt authentication. <a href="/login" class="alert-link">Click here to log in</a></small>
+            `;
+            updateAuthInputVisibility(false);
+        }
+        return;
+    }
+    
+    // For logged-in users, show ready state and authentication input
+    const statusCard = document.getElementById('authStatusCard');
+    if (statusCard) {
+        statusCard.className = 'alert alert-info mb-2';
+        statusCard.innerHTML = `
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Ready for GHunt Authentication</strong>
+            <br><small>Paste your GHunt Companion cookie below and click Authenticate</small>
+        `;
+        // Show authentication input section
+        updateAuthInputVisibility(false);
+    }
+    
+    // Add some debug logging
+    console.log('GHunt page initialized');
+    console.log('CSRF token available:', !!document.querySelector('meta[name=csrf-token]'));
+    console.log('Auth elements found:', {
+        statusCard: !!document.getElementById('authStatusCard'),
+        companionInput: !!document.getElementById('companionInput'),
+        authInputSection: !!document.getElementById('authInputSection')
+    });
+    
+    // Set up auth form submission
+    const authForm = document.getElementById('authForm');
+    if (authForm) {
+        authForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            authenticateWithCompanionCookie();
+        });
+    }
+});
+
+function authenticateFromMainForm() {
+    console.log('authenticateFromMainForm called');
+    
+    const companionInput = document.getElementById('companionInput').value.trim();
+    const progressDiv = document.getElementById('authProgress');
+    const resultDiv = document.getElementById('authResult');
+    const authBtn = document.querySelector('button[onclick="authenticateFromMainForm()"]');
+    
+    console.log('Elements found:', {
+        companionInput: !!companionInput,
+        progressDiv: !!progressDiv,
+        resultDiv: !!resultDiv,
+        authBtn: !!authBtn
+    });
+    
+    if (!companionInput) {
+        console.log('No companion input provided');
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Please paste your GHunt Companion authentication data.
+            </div>
+        `;
+        return;
+    }
+    
+    console.log('Starting authentication with cookie length:', companionInput.length);
+    
+    // Show progress
+    progressDiv.classList.remove('d-none');
+    resultDiv.innerHTML = '';
+    authBtn.disabled = true;
+    
+    fetch('/api/ghunt/authenticate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            companion_cookie: companionInput
+        })
+    })
+    .then(response => {
+        if (response.redirected || response.status === 302) {
+            throw new Error('Login required - please refresh the page and ensure you are logged in');
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        progressDiv.classList.add('d-none');
+        authBtn.disabled = false;
+        
+        if (data.success) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong>Authentication successful!</strong>
+                    <br><small>
+                        ${data.user_email ? `Authenticated as: ${data.user_email}` : 'GHunt authentication is now active'}
+                        <br>Authentication has been saved to your profile.
+                    </small>
+                </div>
+            `;
+            
+            // Clear the input
+            document.getElementById('companionInput').value = '';
+            
+            // Update auth status display
+            checkAuthStatus();
+            
+            // Hide the auth input section after successful authentication
+            setTimeout(() => {
+                updateAuthInputVisibility(true);
+            }, 2000);
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Authentication failed</strong>
+                    <br><small>${data.error || 'Unknown error occurred'}</small>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        progressDiv.classList.add('d-none');
+        authBtn.disabled = false;
+        
+        console.error('Authentication failed:', error);
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Authentication request failed</strong>
+                <br><small>Network error: ${error.message}</small>
+            </div>
+        `;
+    });
+}
+
+function authenticateWithCompanionCookie() {
+    // Legacy function - redirect to main form authentication
+    authenticateFromMainForm();
+}
+
+function clearAuthentication() {
+    if (!confirm('Are you sure you want to clear your GHunt authentication? You will need to re-authenticate to use GHunt features.')) {
+        return;
+    }
+    
+    fetch('/api/ghunt/clear-auth', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Clear any result messages
+            const authResult = document.getElementById('authResult');
+            if (authResult) {
+                authResult.innerHTML = '';
+                
+                // Update auth status display (will show input section)
+                checkAuthStatus();
+                
+                // Show success message in auth result
+                authResult.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Authentication cleared successfully</strong>
+                        <br><small>You can now authenticate with new credentials</small>
+                    </div>
+                `;
+            }
+        } else {
+            alert('Failed to clear authentication: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Clear auth failed:', error);
+        alert('Failed to clear authentication: ' + error.message);
+    });
+}
+</script>
+{% endblock %}

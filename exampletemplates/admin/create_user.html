@@ -1,0 +1,219 @@
+{% extends "base_new.html" %}
+
+{% block title %}Create User - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-plus"></i> Create New User
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                                {{ form.username(class="form-control") }}
+                                {% if form.username.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.username.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
+                                {{ form.email(class="form-control") }}
+                                {% if form.email.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.email.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="first_name" class="form-label">First Name</label>
+                                {{ form.first_name(class="form-control") }}
+                                {% if form.first_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.first_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="last_name" class="form-label">Last Name</label>
+                                {{ form.last_name(class="form-control") }}
+                                {% if form.last_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.last_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="organization" class="form-label">Organization</label>
+                        {{ form.organization(class="form-control") }}
+                        {% if form.organization.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.organization.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+                                {{ form.password(class="form-control", type="password") }}
+                                {% if form.password.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.password.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Minimum 8 characters required</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="roles" class="form-label">Role <span class="text-danger">*</span></label>
+                                {{ form.roles(class="form-select") }}
+                                {% if form.roles.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.roles.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    {{ form.active(class="form-check-input") }}
+                                    <label class="form-check-label" for="active">
+                                        Account Active
+                                    </label>
+                                </div>
+                                <div class="form-text">User can login when active</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    {{ form.confirm_email(class="form-check-input") }}
+                                    <label class="form-check-label" for="confirm_email">
+                                        Send confirmation email
+                                    </label>
+                                </div>
+                                <div class="form-text">User will need to confirm email to login</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.users') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Users
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Create User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Role Permissions</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Admin</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check text-success"></i> All OSINT Tools</li>
+                            <li><i class="bi bi-check text-success"></i> User Management</li>
+                            <li><i class="bi bi-check text-success"></i> System Configuration</li>
+                            <li><i class="bi bi-check text-success"></i> Audit Logs</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>User</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check text-success"></i> Holehe</li>
+                            <li><i class="bi bi-check text-success"></i> Sherlock</li>
+                            <li><i class="bi bi-check text-success"></i> Telegram</li>
+                            <li><i class="bi bi-x text-danger"></i> Instaloader</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Guest</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check text-success"></i> Holehe</li>
+                            <li><i class="bi bi-x text-danger"></i> Sherlock</li>
+                            <li><i class="bi bi-x text-danger"></i> Telegram</li>
+                            <li><i class="bi bi-x text-danger"></i> Instaloader</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-generate username from email if username is empty
+document.getElementById('email').addEventListener('input', function() {
+    const usernameField = document.getElementById('username');
+    if (!usernameField.value && this.value.includes('@')) {
+        usernameField.value = this.value.split('@')[0];
+    }
+});
+
+// Password strength indicator
+document.getElementById('password').addEventListener('input', function() {
+    const password = this.value;
+    let strength = 0;
+    
+    if (password.length >= 8) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    
+    const indicator = document.getElementById('password-strength');
+    if (!indicator) {
+        const div = document.createElement('div');
+        div.id = 'password-strength';
+        div.className = 'form-text';
+        this.parentNode.appendChild(div);
+    }
+    
+    const strengthText = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'][strength - 1] || 'Very Weak';
+    const strengthColor = ['danger', 'warning', 'info', 'success', 'primary'][strength - 1] || 'danger';
+    
+    document.getElementById('password-strength').innerHTML = 
+        `Password strength: <span class="text-${strengthColor}">${strengthText}</span>`;
+});
+</script>
+{% endblock %}

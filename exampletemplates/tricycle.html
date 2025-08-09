@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Restricted</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .container {
+            text-align: center;
+            color: white;
+            max-width: 800px;
+            padding: 2rem;
+        }
+        
+        .tricycle-container {
+            position: relative;
+            margin: 2rem auto;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .tricycle {
+            width: 300px;
+            height: 200px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        /* Tricycle wheels */
+        .wheel {
+            width: 60px;
+            height: 60px;
+            border: 8px solid #fff;
+            border-radius: 50%;
+            position: absolute;
+            background: transparent;
+            animation: spin 4s linear infinite;
+        }
+        
+        .wheel.front {
+            bottom: 0;
+            right: 40px;
+        }
+        
+        .wheel.back-left {
+            bottom: 0;
+            left: 20px;
+        }
+        
+        .wheel.back-right {
+            bottom: 0;
+            left: 80px;
+        }
+        
+        /* Tricycle frame */
+        .frame {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 3px;
+            background: #fff;
+        }
+        
+        .frame::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            bottom: 0;
+            width: 3px;
+            height: 40px;
+            background: #fff;
+            transform: rotate(45deg);
+            transform-origin: bottom;
+        }
+        
+        .frame::after {
+            content: '';
+            position: absolute;
+            right: 20px;
+            bottom: 0;
+            width: 3px;
+            height: 40px;
+            background: #fff;
+            transform: rotate(-45deg);
+            transform-origin: bottom;
+        }
+        
+        .seat {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 15px;
+            background: #fff;
+            border-radius: 15px 15px 0 0;
+        }
+        
+        .handlebar {
+            position: absolute;
+            bottom: 50px;
+            right: 30px;
+            width: 40px;
+            height: 3px;
+            background: #fff;
+        }
+        
+        .handlebar::before {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -10px;
+            width: 3px;
+            height: 25px;
+            background: #fff;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .message {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.8;
+            margin-top: 2rem;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .clouds {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+        
+        .cloud {
+            position: absolute;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50px;
+            animation: drift 20s linear infinite;
+        }
+        
+        .cloud::before,
+        .cloud::after {
+            content: '';
+            position: absolute;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50px;
+        }
+        
+        .cloud1 {
+            width: 100px;
+            height: 40px;
+            top: 20%;
+            left: -100px;
+            animation-delay: 0s;
+        }
+        
+        .cloud1::before {
+            width: 50px;
+            height: 50px;
+            top: -25px;
+            left: 10px;
+        }
+        
+        .cloud1::after {
+            width: 60px;
+            height: 40px;
+            top: -15px;
+            right: 10px;
+        }
+        
+        .cloud2 {
+            width: 80px;
+            height: 30px;
+            top: 60%;
+            left: -80px;
+            animation-delay: -10s;
+        }
+        
+        .cloud2::before {
+            width: 40px;
+            height: 40px;
+            top: -20px;
+            left: 15px;
+        }
+        
+        .cloud2::after {
+            width: 50px;
+            height: 30px;
+            top: -10px;
+            right: 15px;
+        }
+        
+        @keyframes drift {
+            from { transform: translateX(0); }
+            to { transform: translateX(calc(100vw + 200px)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="clouds">
+        <div class="cloud cloud1"></div>
+        <div class="cloud cloud2"></div>
+    </div>
+    
+    <div class="container">
+        <h1>🚲</h1>
+        
+        <div class="tricycle-container">
+            <div class="tricycle">
+                <div class="wheel front"></div>
+                <div class="wheel back-left"></div>
+                <div class="wheel back-right"></div>
+                <div class="frame"></div>
+                <div class="seat"></div>
+                <div class="handlebar"></div>
+            </div>
+        </div>
+        
+        <!-- DEBUG: Certificate Headers -->
+        <div style="background: rgba(255,255,255,0.1); padding: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; font-family: monospace; font-size: 12px; text-align: left;">
+            <strong>Certificate Debug Info:</strong><br>
+            X-SSL-Client-Verify: {{ request.headers.get('X-SSL-Client-Verify', 'NOT_SET') }}<br>
+            X-SSL-Client-Serial: {{ request.headers.get('X-SSL-Client-Serial', 'NOT_SET') }}<br>
+            X-SSL-Client-S-DN: {{ request.headers.get('X-SSL-Client-S-DN', 'NOT_SET') }}<br>
+            Session cert_validated: {{ session.get('cert_validated', 'NOT_SET') }}<br>
+            Current User: {{ current_user.is_authenticated if current_user else 'Anonymous' }}<br>
+            Remote Addr: {{ request.remote_addr }}<br>
+        </div>
+
+        <div class="message">
+            Certificate Required for Access
+        </div>
+        
+        <div class="subtitle">
+            To access the OSINT application, you need a client certificate.<br>
+            Visit <strong>https://192.168.10.98</strong> and your browser will prompt for certificate selection.
+        </div>
+    </div>
+</body>
+</html>

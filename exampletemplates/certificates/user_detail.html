@@ -1,0 +1,283 @@
+{% extends "base_new.html" %}
+
+{% block title %}{{ user.username }} Certificates - OSINT Web Toolkit{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-person-badge"></i> {{ user.username }} Certificate Management</h1>
+                <a href="{{ url_for('certificates.user_list') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to User List
+                </a>
+            </div>
+
+            <!-- User Information -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-person"></i> User Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-4">Username:</dt>
+                                <dd class="col-sm-8">{{ user.username }}</dd>
+                                
+                                <dt class="col-sm-4">Email:</dt>
+                                <dd class="col-sm-8">{{ user.email }}</dd>
+                                
+                                {% if user.full_name != user.username %}
+                                <dt class="col-sm-4">Full Name:</dt>
+                                <dd class="col-sm-8">{{ user.full_name }}</dd>
+                                {% endif %}
+                                
+                                <dt class="col-sm-4">Active:</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge bg-{{ 'success' if user.active else 'danger' }}">
+                                        {{ 'Yes' if user.active else 'No' }}
+                                    </span>
+                                </dd>
+                                
+                                <dt class="col-sm-4">Last Login:</dt>
+                                <dd class="col-sm-8">
+                                    {% if user.last_login_at %}
+                                        {{ user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                        <em class="text-muted">Never</em>
+                                    {% endif %}
+                                </dd>
+                                
+                                <dt class="col-sm-4">Certificate Required:</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge bg-{{ 'success' if user.certificate_required else 'secondary' }}">
+                                        {{ 'Yes' if user.certificate_required else 'No' }}
+                                    </span>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-shield-check"></i> Current Certificate Status</h5>
+                        </div>
+                        <div class="card-body">
+                            {% set active_cert = user.get_active_certificate() %}
+                            {% if active_cert %}
+                                <dl class="row">
+                                    <dt class="col-sm-4">Status:</dt>
+                                    <dd class="col-sm-8">
+                                        <span class="badge bg-{{ 'success' if active_cert.is_valid else ('danger' if active_cert.revoked else 'warning') }} fs-6">
+                                            {{ active_cert.status }}
+                                        </span>
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">Serial Number:</dt>
+                                    <dd class="col-sm-8"><code>{{ active_cert.serial_number }}</code></dd>
+                                    
+                                    <dt class="col-sm-4">Issued:</dt>
+                                    <dd class="col-sm-8">{{ active_cert.issued_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                                    
+                                    <dt class="col-sm-4">Expires:</dt>
+                                    <dd class="col-sm-8">
+                                        {{ active_cert.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                                        {% if active_cert.is_valid %}
+                                            <br><small class="text-muted">({{ active_cert.days_until_expiry }} days remaining)</small>
+                                        {% endif %}
+                                    </dd>
+                                    
+                                    {% if active_cert.last_used_at %}
+                                    <dt class="col-sm-4">Last Used:</dt>
+                                    <dd class="col-sm-8">
+                                        {{ active_cert.last_used_at.strftime('%Y-%m-%d %H:%M') }}
+                                        <br><small class="text-muted">({{ active_cert.usage_count }} times)</small>
+                                    </dd>
+                                    {% endif %}
+                                    
+                                    {% if active_cert.revoked %}
+                                    <dt class="col-sm-4">Revoked:</dt>
+                                    <dd class="col-sm-8">
+                                        {{ active_cert.revoked_at.strftime('%Y-%m-%d %H:%M') }}
+                                        <br><small class="text-muted">Reason: {{ active_cert.revoked_reason }}</small>
+                                    </dd>
+                                    {% endif %}
+                                </dl>
+                            {% else %}
+                                <div class="text-center">
+                                    <i class="bi bi-shield-x fs-1 text-muted"></i>
+                                    <p class="text-muted mt-2">No active certificate</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Certificate Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-tools"></i> Certificate Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% if not user.has_valid_certificate() %}
+                        <div class="col-md-4">
+                            <h6>Generate New Certificate</h6>
+                            <form method="post" action="{{ url_for('certificates.generate_certificate', user_id=user.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="mb-2">
+                                    <select name="valid_days" class="form-select form-select-sm">
+                                        <option value="30">30 days</option>
+                                        <option value="90">90 days</option>
+                                        <option value="180">180 days</option>
+                                        <option value="365" selected>1 year</option>
+                                        <option value="730">2 years</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-success" 
+                                        onclick="return confirm('Generate new certificate for {{ user.username }}?')">
+                                    <i class="bi bi-shield-plus"></i> Generate Certificate
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                        
+                        {% if active_cert and active_cert.is_valid %}
+                        <div class="col-md-4">
+                            <h6>Download Certificate</h6>
+                            <a href="{{ url_for('certificates.download_certificate', cert_id=active_cert.id) }}" 
+                               class="btn btn-primary">
+                                <i class="bi bi-download"></i> Download P12 File
+                            </a>
+                            <p class="small text-muted mt-1">Password: <code>{{ active_cert.p12_password }}</code></p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if active_cert and not active_cert.revoked %}
+                        <div class="col-md-4">
+                            <h6>Revoke Certificate</h6>
+                            <form method="post" action="{{ url_for('certificates.revoke_certificate', cert_id=active_cert.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="mb-2">
+                                    <select name="reason" class="form-select form-select-sm">
+                                        <option value="admin_revoked">Admin Revoked</option>
+                                        <option value="key_compromise">Key Compromise</option>
+                                        <option value="user_request">User Request</option>
+                                        <option value="superseded">Superseded</option>
+                                        <option value="cessation_of_operation">Cessation of Operation</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-danger" 
+                                        onclick="return confirm('Revoke certificate for {{ user.username }}? This cannot be undone.')">
+                                    <i class="bi bi-shield-x"></i> Revoke Certificate
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Certificate History -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Certificate History</h5>
+                    <span class="badge bg-secondary">{{ certificates|length }} total</span>
+                </div>
+                <div class="card-body">
+                    {% if certificates %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Serial Number</th>
+                                        <th>Status</th>
+                                        <th>Issued</th>
+                                        <th>Expires</th>
+                                        <th>Usage</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for cert in certificates %}
+                                    <tr class="{{ 'table-success' if cert.active and cert.is_valid else '' }}">
+                                        <td>
+                                            <code>{{ cert.serial_number }}</code>
+                                            {% if cert.active %}
+                                                <span class="badge bg-info ms-2">Active</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if cert.is_valid else ('danger' if cert.revoked else 'warning') }}">
+                                                {{ cert.status }}
+                                            </span>
+                                        </td>
+                                        <td>{{ cert.issued_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            {{ cert.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                                            {% if cert.is_valid and cert.days_until_expiry <= 30 %}
+                                                <br><small class="text-warning">({{ cert.days_until_expiry }} days left)</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if cert.usage_count > 0 %}
+                                                {{ cert.usage_count }} times
+                                                {% if cert.last_used_at %}
+                                                    <br><small class="text-muted">Last: {{ cert.last_used_at.strftime('%Y-%m-%d') }}</small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">Never used</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                {% if cert.is_valid %}
+                                                    <a href="{{ url_for('certificates.download_certificate', cert_id=cert.id) }}" 
+                                                       class="btn btn-outline-primary" title="Download Certificate">
+                                                        <i class="bi bi-download"></i>
+                                                    </a>
+                                                {% endif %}
+                                                {% if not cert.revoked %}
+                                                    <form method="post" action="{{ url_for('certificates.revoke_certificate', cert_id=cert.id) }}" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                        <input type="hidden" name="reason" value="admin_revoked"/>
+                                                        <button type="submit" class="btn btn-outline-danger" 
+                                                                onclick="return confirm('Revoke this certificate?')" 
+                                                                title="Revoke Certificate">
+                                                            <i class="bi bi-shield-x"></i>
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% if cert.revoked %}
+                                    <tr class="table-light">
+                                        <td colspan="6">
+                                            <small class="text-muted">
+                                                <i class="bi bi-info-circle"></i>
+                                                Revoked on {{ cert.revoked_at.strftime('%Y-%m-%d %H:%M') }} - 
+                                                Reason: {{ cert.revoked_reason }}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-clock-history fs-1 text-muted"></i>
+                            <p class="text-muted mt-2">No certificate history found for this user.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

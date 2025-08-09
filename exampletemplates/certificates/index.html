@@ -1,0 +1,259 @@
+{% extends "base_new.html" %}
+
+{% block title %}Certificate Management - OSINT Web Toolkit{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-shield-check"></i> Certificate Management</h1>
+                <div class="btn-group">
+                    <a href="{{ url_for('certificates.user_list') }}" class="btn btn-primary">
+                        <i class="bi bi-people"></i> Manage Users
+                    </a>
+                    <a href="{{ url_for('certificates.download_ca_certificate') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-download"></i> Download CA Certificate
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Total Users</h5>
+                                    <h2 class="mb-0">{{ total_users }}</h2>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-people fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Active Certificates</h5>
+                                    <h2 class="mb-0">{{ active_certs }}</h2>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-shield-check fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Users with Certificates</h5>
+                                    <h2 class="mb-0">{{ users_with_certs }}</h2>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-person-check fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Revoked Certificates</h5>
+                                    <h2 class="mb-0">{{ revoked_certs }}</h2>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-shield-x fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Expiring Certificates -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-warning"></i> Expiring Certificates</h5>
+                            <span class="badge bg-warning">{{ expiring_certs|length }}</span>
+                        </div>
+                        <div class="card-body">
+                            {% if expiring_certs %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>User</th>
+                                                <th>Serial</th>
+                                                <th>Expires</th>
+                                                <th>Days Left</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for cert in expiring_certs %}
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ url_for('certificates.user_detail', user_id=cert.user.id) }}">
+                                                        {{ cert.user.username }}
+                                                    </a>
+                                                </td>
+                                                <td><small>{{ cert.serial_number }}</small></td>
+                                                <td>{{ cert.expires_at.strftime('%Y-%m-%d') }}</td>
+                                                <td>
+                                                    <span class="badge bg-warning">{{ cert.days_until_expiry }}</span>
+                                                </td>
+                                                <td>
+                                                    <form method="post" action="{{ url_for('certificates.generate_certificate', user_id=cert.user.id) }}" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                        <input type="hidden" name="valid_days" value="365"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary" 
+                                                                onclick="return confirm('Generate new certificate for {{ cert.user.username }}?')">
+                                                            <i class="bi bi-arrow-clockwise"></i> Renew
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted mb-0">No certificates expiring in the next 30 days.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Certificate Activity</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_activity %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>User</th>
+                                                <th>Action</th>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for cert in recent_activity %}
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ url_for('certificates.user_detail', user_id=cert.user.id) }}">
+                                                        {{ cert.user.username }}
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    {% if cert.revoked %}
+                                                        <span class="text-danger">Revoked</span>
+                                                    {% else %}
+                                                        <span class="text-success">Generated</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ cert.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'danger' if cert.revoked else ('success' if cert.is_valid else 'warning') }}">
+                                                        {{ cert.status }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted mb-0">No recent certificate activity.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-tools"></i> Certificate Management Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <h6>Cleanup Operations</h6>
+                                    <button type="button" class="btn btn-warning" onclick="cleanupExpiredCertificates()">
+                                        <i class="bi bi-trash"></i> Cleanup Expired Certificates
+                                    </button>
+                                    <p class="small text-muted mt-2">Remove expired certificate files from storage.</p>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6>CA Certificate</h6>
+                                    <a href="{{ url_for('certificates.download_ca_certificate') }}" class="btn btn-info">
+                                        <i class="bi bi-download"></i> Download CA Certificate
+                                    </a>
+                                    <p class="small text-muted mt-2">Download the root CA certificate for server configuration.</p>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6>User Management</h6>
+                                    <a href="{{ url_for('certificates.user_list') }}" class="btn btn-primary">
+                                        <i class="bi bi-people"></i> Manage User Certificates
+                                    </a>
+                                    <p class="small text-muted mt-2">Generate, revoke, and manage user certificates.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function cleanupExpiredCertificates() {
+    if (!confirm('This will permanently delete expired certificate files. Continue?')) {
+        return;
+    }
+    
+    fetch('/certificates/api/cleanup-expired', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`Cleanup completed: ${data.cleaned_count} certificates removed`);
+            location.reload();
+        } else {
+            alert(`Cleanup failed: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Cleanup failed: Network error');
+    });
+}
+</script>
+{% endblock %}

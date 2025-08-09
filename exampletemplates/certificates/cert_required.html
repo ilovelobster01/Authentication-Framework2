@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Required - OSINT Web Toolkit</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cert-required-card {
+            max-width: 600px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .cert-icon {
+            font-size: 4rem;
+            color: #dc3545;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .fallback-login {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="cert-required-card">
+            <div class="card-body text-center p-5">
+                <!-- Certificate Icon -->
+                <div class="mb-4">
+                    <i class="bi bi-shield-exclamation cert-icon"></i>
+                </div>
+                
+                <!-- Main Message -->
+                <h1 class="h2 mb-3 text-dark">Client Certificate Required</h1>
+                <p class="lead text-muted mb-4">
+                    Access to this system requires a valid client certificate installed in your browser.
+                </p>
+                
+                <!-- Error Message -->
+                {% if error_message %}
+                <div class="alert alert-danger" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Error:</strong> {{ error_message }}
+                </div>
+                {% endif %}
+                
+                <!-- Information -->
+                <div class="row text-start mb-4">
+                    <div class="col-md-6">
+                        <h5><i class="bi bi-shield-check text-primary"></i> What are client certificates?</h5>
+                        <p class="small text-muted">
+                            Client certificates are digital certificates stored in your browser that prove your identity 
+                            and provide secure access to protected systems.
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5><i class="bi bi-download text-success"></i> How to get a certificate?</h5>
+                        <p class="small text-muted">
+                            Contact your system administrator to request a client certificate. They will provide you 
+                            with a P12 file and installation instructions.
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Installation Instructions -->
+                <div class="text-start">
+                    <h5><i class="bi bi-gear text-info"></i> Installation Steps:</h5>
+                    <ol class="small text-muted">
+                        <li>Obtain your P12 certificate file from your administrator</li>
+                        <li>Import the certificate into your browser's certificate store</li>
+                        <li>Restart your browser</li>
+                        <li>Return to this page and select your certificate when prompted</li>
+                    </ol>
+                </div>
+                
+                <!-- Browser Support -->
+                <div class="text-start mt-4">
+                    <h6><i class="bi bi-browsers text-secondary"></i> Supported Browsers:</h6>
+                    <div class="row">
+                        <div class="col-4 text-center">
+                            <i class="bi bi-browser-chrome fs-3 text-warning"></i>
+                            <br><small>Chrome</small>
+                        </div>
+                        <div class="col-4 text-center">
+                            <i class="bi bi-browser-firefox fs-3 text-primary"></i>
+                            <br><small>Firefox</small>
+                        </div>
+                        <div class="col-4 text-center">
+                            <i class="bi bi-browser-edge fs-3 text-info"></i>
+                            <br><small>Edge</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Fallback Login (Testing) -->
+                <div class="fallback-login">
+                    <h6><i class="bi bi-key text-warning"></i> Temporary Access (Testing Only)</h6>
+                    <p class="small text-muted mb-3">
+                        If you're testing the system or need temporary access while setting up your certificate, 
+                        you can use the traditional login method below.
+                    </p>
+                    <a href="{{ url_for('security.login') }}?fallback=true" class="btn btn-warning">
+                        <i class="bi bi-box-arrow-in-right"></i> Fallback Login
+                    </a>
+                    <p class="small text-muted mt-2">
+                        <strong>Note:</strong> This option may be disabled in production environments.
+                    </p>
+                </div>
+                
+                <!-- Contact Information -->
+                <div class="mt-4 pt-3 border-top">
+                    <p class="small text-muted mb-2">
+                        <strong>Need help?</strong> Contact your system administrator:
+                    </p>
+                    <div class="btn-group">
+                        <a href="mailto:admin@example.com" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-envelope"></i> Email Support
+                        </a>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.location.reload()">
+                            <i class="bi bi-arrow-clockwise"></i> Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-retry every 30 seconds to check for certificate
+        setTimeout(function() {
+            window.location.reload();
+        }, 30000);
+        
+        // Check for certificate installation
+        if (navigator.userAgent.includes('Chrome') || navigator.userAgent.includes('Edge')) {
+            console.log('Chrome/Edge detected - Certificate should be in Windows Certificate Store');
+        } else if (navigator.userAgent.includes('Firefox')) {
+            console.log('Firefox detected - Certificate should be in Firefox Certificate Manager');
+        }
+    </script>
+</body>
+</html>

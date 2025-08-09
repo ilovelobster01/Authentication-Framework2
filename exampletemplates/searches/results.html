@@ -1,0 +1,700 @@
+{% extends "base_new.html" %}
+
+{% block title %}Search Results - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-list-ul"></i> Detailed Search Results</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('searches.index') }}">Searches</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('searches.view', id=search.id) }}">{{ search.tool_name.title() }} Search</a></li>
+                <li class="breadcrumb-item active">Results</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="btn-group">
+        <a href="{{ url_for('searches.view', id=search.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Search
+        </a>
+        <a href="{{ url_for('searches.index') }}" class="btn btn-outline-primary">
+            <i class="bi bi-list"></i> All Searches
+        </a>
+    </div>
+</div>
+
+<!-- Search Information Summary -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Search Summary</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <strong>Tool:</strong> <span class="badge bg-secondary">{{ search.tool_name.title() }}</span>
+            </div>
+            <div class="col-md-4">
+                <strong>Query:</strong> <code>{{ search.search_query }}</code>
+            </div>
+            <div class="col-md-2">
+                <strong>{% if search.tool_name == 'holehe' %}Found:{% else %}Results:{% endif %}</strong> <span class="badge bg-info">{{ search.results_count }}</span>
+            </div>
+            <div class="col-md-3">
+                <strong>Completed:</strong> {{ search.completed_at.strftime('%Y-%m-%d %H:%M') if search.completed_at else 'N/A' }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Results -->
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-table"></i> 
+                {% if search.tool_name == 'holehe' %}
+                    Accounts Found ({{ search.results_count }}) - {{ search.results | length }} platforms scanned
+                {% else %}
+                    All Results ({{ search.results_count }})
+                {% endif %}
+            </h5>
+            <div>
+                <button class="btn btn-outline-secondary btn-sm" onclick="exportResults()">
+                    <i class="bi bi-download"></i> Export JSON
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if search.results %}
+            {% if search.tool_name == 'holehe' %}
+                <!-- Holehe Results Table -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="resultsTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Platform</th>
+                                <th>Status</th>
+                                <th>Email Recovery</th>
+                                <th>Phone Number</th>
+                                <th>Full Name</th>
+                                <th>Profile URL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in search.results %}
+                            <tr>
+                                <td>
+                                    <strong>{{ result.platform }}</strong>
+                                    {% if result.get('exists') %}
+                                        <i class="bi bi-check-circle text-success ms-1"></i>
+                                    {% elif result.get('rate_limited') %}
+                                        <i class="bi bi-hourglass text-warning ms-1"></i>
+                                    {% else %}
+                                        <i class="bi bi-x-circle text-muted ms-1"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if result.get('exists') %}
+                                        <span class="badge bg-success">Found</span>
+                                    {% elif result.get('rate_limited') %}
+                                        <span class="badge bg-warning">Rate Limited</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Not Found</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if result.get('email_recovery') %}
+                                        <small class="text-info">{{ result.email_recovery }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if result.get('phone_number') %}
+                                        <small class="text-info">{{ result.phone_number }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if result.get('full_name') %}
+                                        <small class="text-info">{{ result.full_name }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if result.get('profile_url') %}
+                                        <a href="{{ result.profile_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+            {% elif search.tool_name == 'sherlock' %}
+                <!-- Sherlock Results -->
+                {% set sherlock_results = search.results.results if search.results is mapping and 'results' in search.results else search.results %}
+                <div class="row">
+                    {% for result in sherlock_results %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="bi bi-person-circle text-primary"></i>
+                                    {% if result.platform and result.platform != 'unknown' and result.platform != 'Unknown' %}
+                                        {{ result.platform }}
+                                    {% elif result.site and result.site != 'unknown' and result.site != 'Unknown' %}
+                                        {{ result.site }}
+                                    {% else %}
+                                        {# Extract platform name from URL as fallback #}
+                                        {% set url_parts = result.url.replace('https://', '').replace('http://', '').replace('www.', '').split('/') %}
+                                        {% set domain_parts = url_parts[0].split('.') %}
+                                        {{ domain_parts[0]|title if domain_parts else 'Unknown Platform' }}
+                                    {% endif %}
+                                </h6>
+                                <p class="card-text">
+                                    <small class="text-muted">Profile found for username: <strong>{{ search.search_query }}</strong></small>
+                                </p>
+                                <a href="{{ result.url }}" target="_blank" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-box-arrow-up-right"></i> View Profile
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+            {% elif search.tool_name == 'ghunt' %}
+                <!-- GHunt Enhanced Results Display -->
+                <div id="ghuntResultsContainer">
+                    {% for result in search.results %}
+                    <div class="result-item mb-4 p-3 border rounded">
+                        <div class="result-header d-flex justify-content-between align-items-center mb-3">
+                            <span>
+                                <i class="bi {{ 'bi-check-circle text-success' if result.success else 'bi-x-circle text-danger' }} me-2"></i>
+                                <strong>{{ (result.search_type or 'GHUNT').upper() }} Investigation</strong>
+                            </span>
+                            <span class="badge {{ 'bg-success' if result.success else 'bg-danger' }}">
+                                {{ 'Success' if result.success else 'Failed' }}
+                            </span>
+                        </div>
+                        <div class="result-content">
+                            <div class="row mb-2">
+                                <div class="col-4"><strong>Target:</strong></div>
+                                <div class="col-8">{{ result.target or 'Unknown' }}</div>
+                            </div>
+                            
+                            {% if result.success and result.data %}
+                                <div id="ghuntParsedData-{{ loop.index }}">
+                                    <script type="application/json" id="ghuntData-{{ loop.index }}">{{ result.data | tojson | safe }}</script>
+                                </div>
+                            {% elif result.error %}
+                                <div class="alert alert-danger mt-2">
+                                    <strong>Error:</strong> {{ result.error }}
+                                </div>
+                            {% endif %}
+                            
+                            {% if result.metadata %}
+                                <div class="row mt-3 pt-2 border-top">
+                                    <div class="col-12">
+                                        <small class="text-muted">
+                                            Timestamp: {{ result.metadata.timestamp | default('Unknown') }} | 
+                                            Tor: {{ 'Yes' if result.metadata.tor_used else 'No' }}
+                                        </small>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+            {% else %}
+                <!-- Generic Results Display -->
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Raw Results</h6>
+                    <pre class="mt-2"><code>{{ search.results | tojson(indent=2) }}</code></pre>
+                </div>
+            {% endif %}
+            
+        {% else %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                No results available for this search.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Utility function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Enhanced GHunt result parser (same as in ghunt.html)
+function parseGHuntResults(data) {
+    const result = {
+        hasData: false,
+        html: ''
+    };
+    
+    let html = '';
+    let foundData = false;
+    
+    // Helper function to safely get nested properties
+    function safeGet(obj, path, defaultValue = null) {
+        return path.split('.').reduce((current, key) => {
+            return (current && current[key] !== undefined) ? current[key] : defaultValue;
+        }, obj);
+    }
+    
+    // Helper function to format display names
+    function formatKey(key) {
+        return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
+    // Helper function to render a field
+    function renderField(label, value, isUrl = false) {
+        if (!value) return '';
+        foundData = true;
+        
+        const displayValue = isUrl ? 
+            `<a href="${escapeHtml(value)}" target="_blank" class="text-decoration-none">${escapeHtml(value)}</a>` :
+            escapeHtml(String(value));
+            
+        return `
+            <div class="row mb-1">
+                <div class="col-4"><strong>${label}:</strong></div>
+                <div class="col-8">${displayValue}</div>
+            </div>
+        `;
+    }
+    
+    try {
+        // Handle different GHunt response structures
+        
+        // PRIORITY: Extract display_name and person_id from actual GHunt structure
+        let foundDisplayName = null;
+        let foundPersonId = null;
+        
+        // Check for PROFILE_CONTAINER structure (actual GHunt format)
+        if (data.PROFILE_CONTAINER) {
+            // Extract person_id from profile
+            if (data.PROFILE_CONTAINER.profile && data.PROFILE_CONTAINER.profile.personId) {
+                foundPersonId = data.PROFILE_CONTAINER.profile.personId;
+            }
+            
+            // Extract display_name from profile or calendar events
+            if (data.PROFILE_CONTAINER.profile && data.PROFILE_CONTAINER.profile.display_name) {
+                foundDisplayName = data.PROFILE_CONTAINER.profile.display_name;
+            }
+            
+            // Check calendar events for creator display_name
+            if (!foundDisplayName && data.PROFILE_CONTAINER.calendar && data.PROFILE_CONTAINER.calendar.events && data.PROFILE_CONTAINER.calendar.events.items) {
+                const events = data.PROFILE_CONTAINER.calendar.events.items;
+                if (Array.isArray(events)) {
+                    events.forEach((event, index) => {
+                        if (event.creator && event.creator.display_name && !foundDisplayName) {
+                            foundDisplayName = event.creator.display_name;
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Fallback: Check for older structure
+        if (!foundDisplayName || !foundPersonId) {
+            if (data.items && Array.isArray(data.items)) {
+                data.items.forEach(item => {
+                    if (item.creator && item.creator.display_name && !foundDisplayName) {
+                        foundDisplayName = item.creator.display_name;
+                    }
+                    if (item.creator && item.creator.person_id && !foundPersonId) {
+                        foundPersonId = item.creator.person_id;
+                    }
+                });
+            }
+        }
+        
+        // Display priority information at the top
+        if (foundDisplayName || foundPersonId) {
+            html += '<div class="mt-2 mb-2"><strong class="text-success">🎯 Key Identity Information:</strong></div>';
+            if (foundDisplayName) {
+                html += renderField('👤 Display Name', foundDisplayName);
+            }
+            if (foundPersonId) {
+                html += renderField('🆔 Person ID', foundPersonId);
+            }
+        }
+        
+        // Check for main profile information
+        if (data.name || data.display_name || data.email || data.gaia_id) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Profile Information:</strong></div>';
+            html += renderField('Name', data.name);
+            html += renderField('Display Name', data.display_name);
+            html += renderField('Email', data.email);
+            html += renderField('Gaia ID', data.gaia_id);
+            html += renderField('Customer ID', data.customer_id || data.customerId);
+        }
+        
+        // Extract emails from nested structures
+        if (data.emails && Array.isArray(data.emails)) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Email Addresses:</strong></div>';
+            data.emails.forEach((emailData, index) => {
+                if (typeof emailData === 'object' && emailData.contact && emailData.contact.value) {
+                    html += renderField(`Email ${index + 1}`, emailData.contact.value);
+                    html += renderField(`Email ${index + 1} Type`, emailData.contact.type || emailData.type);
+                } else if (typeof emailData === 'string') {
+                    html += renderField(`Email ${index + 1}`, emailData);
+                } else if (emailData.value) {
+                    html += renderField(`Email ${index + 1}`, emailData.value);
+                    html += renderField(`Email ${index + 1} Type`, emailData.type);
+                }
+            });
+        }
+        
+        // Check for contact information with nested email structures
+        if (data.contact) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Contact Information:</strong></div>';
+            if (data.contact.emails && Array.isArray(data.contact.emails)) {
+                data.contact.emails.forEach((emailData, index) => {
+                    if (emailData.value) {
+                        html += renderField(`Contact Email ${index + 1}`, emailData.value);
+                        html += renderField(`Contact Email ${index + 1} Type`, emailData.type);
+                    }
+                });
+            }
+            if (data.contact.value) {
+                html += renderField('Contact Value', data.contact.value);
+            }
+        }
+        
+        // Check for YouTube data
+        if (data.youtube) {
+            const yt = data.youtube;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">YouTube Information:</strong></div>';
+            html += renderField('Channel Name', yt.name || yt.channel_name);
+            html += renderField('Channel ID', yt.id || yt.channel_id);
+            html += renderField('Channel URL', yt.url || yt.channel_url, true);
+            html += renderField('Subscriber Count', yt.subscriber_count);
+            html += renderField('Video Count', yt.video_count);
+            html += renderField('View Count', yt.view_count);
+            html += renderField('Creation Date', yt.creation_date);
+            html += renderField('Profile Photo', yt.profile_photo_url, true);
+        }
+        
+        // Check for Google+ / Profile data
+        if (data.gplus || data.profile) {
+            const profile = data.gplus || data.profile;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Profile Information:</strong></div>';
+            html += renderField('Display Name', profile.name || profile.display_name);
+            html += renderField('Person ID', profile.person_id || profile.id);
+            html += renderField('Profile URL', profile.url, true);
+            html += renderField('User Type', profile.user_type || profile.type);
+            html += renderField('Location', profile.location);
+            html += renderField('Occupation', profile.occupation);
+            html += renderField('Profile Photo', profile.photo_url || profile.profile_photo, true);
+        }
+        
+        // Check for photos
+        if (data.photos && Array.isArray(data.photos) && data.photos.length > 0) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Photos:</strong></div>';
+            data.photos.slice(0, 5).forEach((photo, index) => {
+                if (photo.url) {
+                    html += renderField(`Photo ${index + 1}`, photo.url, true);
+                }
+            });
+            if (data.photos.length > 5) {
+                html += renderField('Additional Photos', `... and ${data.photos.length - 5} more`);
+            }
+        }
+        
+        // Check for reviews/maps data
+        if (data.reviews || data.maps) {
+            const reviews = data.reviews || data.maps;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Reviews & Maps:</strong></div>';
+            if (reviews.total_reviews) {
+                html += renderField('Total Reviews', reviews.total_reviews);
+            }
+            if (reviews.average_rating) {
+                html += renderField('Average Rating', reviews.average_rating);
+            }
+            if (Array.isArray(reviews.recent_reviews)) {
+                reviews.recent_reviews.slice(0, 3).forEach((review, index) => {
+                    html += renderField(`Review ${index + 1}`, `${review.rating || 'N/A'} stars - ${review.text || 'No text'}`);
+                });
+            }
+        }
+        
+        // Check for calendar data (comprehensive)
+        if (data.calendar) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Calendar Information:</strong></div>';
+            html += renderField('Calendar Access', data.calendar.accessible ? 'Yes' : 'No');
+            html += renderField('Calendar URL', data.calendar.url, true);
+            html += renderField('Calendar Name', data.calendar.name);
+            html += renderField('Calendar Description', data.calendar.description);
+            html += renderField('Calendar Location', data.calendar.location);
+            html += renderField('Calendar Timezone', data.calendar.timezone);
+            html += renderField('Calendar Color', data.calendar.color);
+            
+            // Calendar events
+            if (data.calendar.events && Array.isArray(data.calendar.events)) {
+                html += '<div class="mt-2 mb-1"><strong class="text-info">Recent Calendar Events:</strong></div>';
+                data.calendar.events.slice(0, 10).forEach((event, index) => {
+                    html += `<div class="border rounded p-2 mb-2 bg-light">`;
+                    html += renderField(`Event ${index + 1} Title`, event.title || event.summary);
+                    html += renderField(`Event ${index + 1} Description`, event.description);
+                    html += renderField(`Event ${index + 1} Location`, event.location);
+                    html += renderField(`Event ${index + 1} Start`, event.start || event.start_time);
+                    html += renderField(`Event ${index + 1} End`, event.end || event.end_time);
+                    html += renderField(`Event ${index + 1} Creator`, event.creator);
+                    html += renderField(`Event ${index + 1} Attendees`, event.attendees ? event.attendees.join(', ') : null);
+                    html += `</div>`;
+                });
+                if (data.calendar.events.length > 10) {
+                    html += renderField('Additional Events', `... and ${data.calendar.events.length - 10} more events`);
+                }
+            }
+        }
+        
+        // Check for drive data
+        if (data.drive) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Drive Information:</strong></div>';
+            html += renderField('Drive ID', data.drive.id);
+            html += renderField('Drive Name', data.drive.name);
+            html += renderField('Drive URL', data.drive.url, true);
+            html += renderField('File Count', data.drive.file_count);
+            html += renderField('Owner', data.drive.owner);
+        }
+        
+        // Check for contacts/hangouts
+        if (data.hangouts || data.contacts) {
+            const contacts = data.hangouts || data.contacts;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Social Connections:</strong></div>';
+            if (contacts.contact_count) {
+                html += renderField('Contact Count', contacts.contact_count);
+            }
+            if (Array.isArray(contacts.recent_contacts)) {
+                contacts.recent_contacts.slice(0, 3).forEach((contact, index) => {
+                    html += renderField(`Contact ${index + 1}`, contact.name || contact.email);
+                });
+            }
+        }
+        
+        // Check for activity/location data
+        if (data.activity || data.location) {
+            const activity = data.activity || data.location;
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Activity Information:</strong></div>';
+            html += renderField('Last Activity', activity.last_seen);
+            html += renderField('Location History', activity.location_history ? 'Available' : 'Not Available');
+            html += renderField('Timeline Access', activity.timeline_accessible ? 'Yes' : 'No');
+        }
+        
+        // Check for any URLs in the data
+        const allUrls = [];
+        function extractUrls(obj, path = '') {
+            if (typeof obj === 'string' && (obj.startsWith('http') || obj.includes('google.com'))) {
+                allUrls.push({ path, url: obj });
+            } else if (typeof obj === 'object' && obj !== null) {
+                Object.entries(obj).forEach(([key, value]) => {
+                    extractUrls(value, path ? `${path}.${key}` : key);
+                });
+            }
+        }
+        
+        extractUrls(data);
+        if (allUrls.length > 0) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">Related URLs:</strong></div>';
+            allUrls.slice(0, 5).forEach((item, index) => {
+                html += renderField(`URL ${index + 1}`, item.url, true);
+            });
+        }
+        
+        // Comprehensive email extraction from all nested structures
+        const allEmails = [];
+        function extractEmails(obj, path = '') {
+            if (typeof obj === 'string') {
+                // Check if the string looks like an email
+                const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+                const matches = obj.match(emailRegex);
+                if (matches) {
+                    matches.forEach(email => {
+                        if (!allEmails.some(e => e.email === email)) {
+                            allEmails.push({ email, path });
+                        }
+                    });
+                }
+            } else if (typeof obj === 'object' && obj !== null) {
+                Object.entries(obj).forEach(([key, value]) => {
+                    const currentPath = path ? `${path}.${key}` : key;
+                    extractEmails(value, currentPath);
+                });
+            }
+        }
+        
+        extractEmails(data);
+        if (allEmails.length > 0) {
+            html += '<div class="mt-2 mb-2"><strong class="text-primary">All Email Addresses Found:</strong></div>';
+            allEmails.forEach((emailData, index) => {
+                html += renderField(`Found Email ${index + 1}`, emailData.email);
+                html += renderField(`Found Email ${index + 1} Location`, emailData.path);
+            });
+        }
+        
+        // Comprehensive scan for any additional data fields
+        html += '<div class="mt-2 mb-2"><strong class="text-primary">Additional Data Fields:</strong></div>';
+        
+        function scanObjectForData(obj, prefix = '') {
+            if (typeof obj !== 'object' || obj === null) return;
+            
+            Object.entries(obj).forEach(([key, value]) => {
+                const fieldName = prefix ? `${prefix}.${key}` : key;
+                
+                // Skip already processed sections
+                const skipSections = ['youtube', 'gplus', 'profile', 'photos', 'reviews', 'maps', 
+                                    'calendar', 'drive', 'hangouts', 'contacts', 'activity', 'location'];
+                if (skipSections.includes(key) && !prefix) return;
+                
+                if (value !== null && value !== undefined && value !== '') {
+                    if (typeof value === 'object' && !Array.isArray(value)) {
+                        // Recursively scan nested objects (max 2 levels deep)
+                        if (!prefix || prefix.split('.').length < 2) {
+                            scanObjectForData(value, fieldName);
+                        }
+                    } else if (Array.isArray(value) && value.length > 0) {
+                        // Display arrays up to 5 items
+                        if (value.length <= 5) {
+                            html += renderField(formatKey(fieldName), value.join(', '));
+                        } else {
+                            html += renderField(formatKey(fieldName), `${value.slice(0, 5).join(', ')} ... and ${value.length - 5} more`);
+                        }
+                    } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                        // Only show if we haven't already displayed this field
+                        if (!html.includes(formatKey(fieldName))) {
+                            const isUrl = typeof value === 'string' && (value.startsWith('http') || value.includes('google.com'));
+                            html += renderField(formatKey(fieldName), value, isUrl);
+                        }
+                    }
+                }
+            });
+        }
+        
+        scanObjectForData(data);
+        
+        // If no additional fields were found, don't show the empty section
+        if (!html.includes('<div class="row mb-1">')) {
+            html = html.replace('<div class="mt-2 mb-2"><strong class="text-primary">Additional Data Fields:</strong></div>', '');
+        }
+        
+    } catch (error) {
+        console.error('Error parsing GHunt results:', error);
+        html += '<div class="alert alert-warning">Error parsing results data</div>';
+    }
+    
+    result.hasData = foundData;
+    result.html = html;
+    
+    return result;
+}
+
+function exportResults() {
+    const data = {{ search.results | tojson | safe }};
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `{{ search.tool_name }}-results-{{ search.search_query }}-{{ search.completed_at.strftime('%Y%m%d') if search.completed_at else 'latest' }}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Add search functionality for large result sets
+{% if search.tool_name == 'holehe' and search.results_count > 20 %}
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'form-control mb-3';
+    searchInput.placeholder = 'Search platforms...';
+    
+    const table = document.getElementById('resultsTable');
+    table.parentNode.insertBefore(searchInput, table);
+    
+    searchInput.addEventListener('keyup', function() {
+        const filter = this.value.toLowerCase();
+        const rows = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < rows.length; i++) {
+            const platformCell = rows[i].getElementsByTagName('td')[0];
+            if (platformCell) {
+                const platformText = platformCell.textContent || platformCell.innerText;
+                if (platformText.toLowerCase().indexOf(filter) > -1) {
+                    rows[i].style.display = '';
+                } else {
+                    rows[i].style.display = 'none';
+                }
+            }
+        }
+    });
+});
+{% endif %}
+
+// Process GHunt results after functions are defined
+{% if search.tool_name == 'ghunt' %}
+document.addEventListener('DOMContentLoaded', function() {
+    // Find all GHunt result containers and process them
+    const ghuntContainers = document.querySelectorAll('[id^="ghuntParsedData-"]');
+    
+    ghuntContainers.forEach(container => {
+        const containerIndex = container.id.replace('ghuntParsedData-', '');
+        const dataScript = document.getElementById('ghuntData-' + containerIndex);
+        if (!dataScript) return;
+        
+        try {
+            const data = JSON.parse(dataScript.textContent);
+            const parsedData = parseGHuntResults(data);
+            
+            if (parsedData.hasData) {
+                container.innerHTML = parsedData.html;
+            } else {
+                // Fallback for unrecognized data structures
+                let fallbackHtml = '';
+                if (data.name) {
+                    fallbackHtml += '<div class="row mb-1"><div class="col-4"><strong>Name:</strong></div><div class="col-8">' + escapeHtml(data.name) + '</div></div>';
+                }
+                if (data.email) {
+                    fallbackHtml += '<div class="row mb-1"><div class="col-4"><strong>Email:</strong></div><div class="col-8">' + escapeHtml(data.email) + '</div></div>';
+                }
+                if (data.gaia_id) {
+                    fallbackHtml += '<div class="row mb-1"><div class="col-4"><strong>Gaia ID:</strong></div><div class="col-8">' + escapeHtml(data.gaia_id) + '</div></div>';
+                }
+                
+                if (fallbackHtml) {
+                    container.innerHTML = fallbackHtml;
+                } else {
+                    // Show raw JSON as last resort
+                    container.innerHTML = '<details class="mt-2"><summary><strong>Raw Investigation Data</strong> (click to expand)</summary><div class="bg-light p-3 rounded mt-2" style="max-height: 300px; overflow-y: auto;"><pre class="mb-0" style="white-space: pre-wrap; font-size: 0.85em;">' + JSON.stringify(data, null, 2) + '</pre></div></details>';
+                }
+            }
+        } catch (error) {
+            console.error('Failed to parse GHunt result data:', error);
+            container.innerHTML = '<div class="alert alert-warning">Error parsing result data</div>';
+        }
+    });
+});
+{% endif %}
+</script>
+{% endblock %}

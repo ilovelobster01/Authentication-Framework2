@@ -1,0 +1,251 @@
+{% extends "base_new.html" %}
+
+{% block title %}Role Management - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-shield-check"></i> Role Management</h3>
+    <a href="{{ url_for('admin.create_role') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Create Role
+    </a>
+</div>
+
+<!-- Roles Grid -->
+<div class="row">
+    {% for role in roles %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 {% if role.name == 'admin' %}border-warning{% elif role.name == 'user' %}border-primary{% elif role.name == 'guest' %}border-secondary{% endif %}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0">
+                        {% if role.name == 'admin' %}
+                            <i class="bi bi-shield-check text-warning"></i>
+                        {% elif role.name == 'user' %}
+                            <i class="bi bi-person text-primary"></i>
+                        {% elif role.name == 'guest' %}
+                            <i class="bi bi-eye text-secondary"></i>
+                        {% else %}
+                            <i class="bi bi-gear text-info"></i>
+                        {% endif %}
+                        {{ role.name.title() }}
+                    </h6>
+                    {% if role.name in ['admin', 'user', 'guest'] %}
+                        <small class="text-muted">System Role</small>
+                    {% else %}
+                        <small class="text-muted">Custom Role</small>
+                    {% endif %}
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        {% if role.name not in ['admin', 'user', 'guest'] %}
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('admin.edit_role', role_id=role.id) }}">
+                                    <i class="bi bi-pencil"></i> Edit Role
+                                </a>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item text-danger" onclick="showDeleteRoleModal({{ role.id }}, '{{ role.name }}', {{ role_stats[role.id].user_count }})">
+                                    <i class="bi bi-trash"></i> Delete Role
+                                </button>
+                            </li>
+                        {% else %}
+                            <li>
+                                <span class="dropdown-item-text text-muted">
+                                    <i class="bi bi-lock"></i> System role - cannot be modified
+                                </span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ role.description or 'No description provided' }}</p>
+                
+                <!-- User Count -->
+                <div class="mb-3">
+                    <span class="badge bg-info">{{ role_stats[role.id].user_count }} user{{ 's' if role_stats[role.id].user_count != 1 else '' }}</span>
+                </div>
+                
+                <!-- Tool Permissions -->
+                <h6 class="text-primary mb-2">Tool Permissions:</h6>
+                {% set tools = role_stats[role.id].permissions.get('tools', []) %}
+                {% set all_tools = available_tools %}
+                
+                {% if role.name == 'admin' %}
+                    <!-- Admin has all permissions -->
+                    {% for tool in all_tools %}
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span>{{ tool.title() }}</span>
+                            <i class="bi bi-check-circle text-success"></i>
+                        </div>
+                    {% endfor %}
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span><strong>Admin Access</strong></span>
+                        <i class="bi bi-shield-check text-warning"></i>
+                    </div>
+                {% else %}
+                    {% for tool in all_tools %}
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span>{{ tool.title() }}</span>
+                            {% if tool in tools %}
+                                <i class="bi bi-check-circle text-success"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle text-danger"></i>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+            {% if role.name not in ['admin', 'user', 'guest'] %}
+            <div class="card-footer bg-transparent">
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('admin.edit_role', role_id=role.id) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteRoleModal({{ role.id }}, '{{ role.name }}', {{ role_stats[role.id].user_count }})">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Summary Information -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle"></i> Role Summary</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 text-center">
+                <h4 class="text-primary">{{ roles|length }}</h4>
+                <p class="text-muted mb-0">Total Roles</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <h4 class="text-success">{{ (roles|selectattr('name', 'eq', 'admin')|list|length + roles|selectattr('name', 'eq', 'user')|list|length + roles|selectattr('name', 'eq', 'guest')|list|length) }}</h4>
+                <p class="text-muted mb-0">System Roles</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <h4 class="text-info">{{ roles|length - 3 if roles|length > 3 else 0 }}</h4>
+                <p class="text-muted mb-0">Custom Roles</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <h4 class="text-warning">{{ role_stats.values()|sum(attribute='user_count') }}</h4>
+                <p class="text-muted mb-0">Total Assignments</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Default Role Descriptions -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-book"></i> Default Role Descriptions</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <h6 class="text-warning"><i class="bi bi-shield-check"></i> Administrator</h6>
+                <ul class="list-unstyled small">
+                    <li><i class="bi bi-check text-success"></i> All OSINT tools access</li>
+                    <li><i class="bi bi-check text-success"></i> User management</li>
+                    <li><i class="bi bi-check text-success"></i> System configuration</li>
+                    <li><i class="bi bi-check text-success"></i> Audit logs access</li>
+                    <li><i class="bi bi-check text-success"></i> Role management</li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <h6 class="text-primary"><i class="bi bi-person"></i> User</h6>
+                <ul class="list-unstyled small">
+                    <li><i class="bi bi-check text-success"></i> Holehe (Email OSINT)</li>
+                    <li><i class="bi bi-check text-success"></i> Sherlock (Username OSINT)</li>
+                    <li><i class="bi bi-check text-success"></i> Telegram OSINT</li>
+                    <li><i class="bi bi-x text-danger"></i> Instaloader</li>
+                    <li><i class="bi bi-x text-danger"></i> Admin functions</li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <h6 class="text-secondary"><i class="bi bi-eye"></i> Guest</h6>
+                <ul class="list-unstyled small">
+                    <li><i class="bi bi-check text-success"></i> Holehe (Email OSINT)</li>
+                    <li><i class="bi bi-x text-danger"></i> Sherlock</li>
+                    <li><i class="bi bi-x text-danger"></i> Telegram OSINT</li>
+                    <li><i class="bi bi-x text-danger"></i> Instaloader</li>
+                    <li><i class="bi bi-x text-danger"></i> Admin functions</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Role Modal -->
+<div class="modal fade" id="deleteRoleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Role</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone!
+                </div>
+                <p>Are you sure you want to delete the role <strong id="roleNameText"></strong>?</p>
+                <div id="userCountWarning" class="alert alert-warning" style="display: none;">
+                    <i class="bi bi-exclamation-circle"></i>
+                    This role is currently assigned to <strong id="userCountText"></strong> user(s). 
+                    You must reassign these users to other roles before deleting this role.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteRoleForm" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="confirm_delete" value="true"/>
+                    <button type="submit" class="btn btn-danger" id="deleteRoleBtn">
+                        <i class="bi bi-trash"></i> Delete Role
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showDeleteRoleModal(roleId, roleName, userCount) {
+    document.getElementById('roleNameText').textContent = roleName;
+    document.getElementById('userCountText').textContent = userCount;
+    
+    const deleteForm = document.getElementById('deleteRoleForm');
+    deleteForm.action = `/admin/roles/${roleId}/delete`;
+    
+    const deleteBtn = document.getElementById('deleteRoleBtn');
+    const userCountWarning = document.getElementById('userCountWarning');
+    
+    if (userCount > 0) {
+        userCountWarning.style.display = 'block';
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<i class="bi bi-x-circle"></i> Cannot Delete';
+        deleteBtn.className = 'btn btn-secondary';
+    } else {
+        userCountWarning.style.display = 'none';
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = '<i class="bi bi-trash"></i> Delete Role';
+        deleteBtn.className = 'btn btn-danger';
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('deleteRoleModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

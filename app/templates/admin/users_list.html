@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<h1>Users</h1>
+{% if current_fpr %}
+  <div class="current-cert">
+    <strong>Presented certificate:</strong>
+    <ul>
+      <li>Fingerprint (SHA-256): <code>{{ current_fpr }}</code></li>
+      <li>Serial: {{ current_meta.serial }}</li>
+      <li>Subject: {{ current_meta.subject }}</li>
+      <li>Issuer: {{ current_meta.issuer }}</li>
+    </ul>
+  </div>
+{% endif %}
+<p><a href="{{ url_for('admin.create_user') }}">Create new user</a></p>
+<table>
+  <tr>
+    <th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Active</th><th>2FA</th><th>Certificates</th>
+  </tr>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.id }}</td>
+    <td><a href="{{ url_for('admin.user_detail', user_id=u.id) }}">{{ u.username }}</a></td>
+    <td>{{ u.email }}</td>
+    <td>{{ 'Yes' if u.is_admin else 'No' }}</td>
+    <td>{{ 'Yes' if u.is_active else 'No' }}</td>
+    <td>{{ 'Yes' if u.totp_enabled else 'No' }}</td>
+    <td>{{ u.certificates | length }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,633 @@
+{% extends "base_new.html" %}
+
+{% block title %}System Health - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <h2><i class="bi bi-heart-pulse"></i> System Health Monitor</h2>
+        <p class="text-muted mb-0">Real-time system status and monitoring dashboard</p>
+    </div>
+    <div>
+        <button class="btn btn-outline-primary" id="refreshButton" onclick="loadHealthData()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+        <span class="badge bg-secondary" id="lastUpdated">Loading...</span>
+    </div>
+</div>
+
+<!-- Overall Status Card -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card" id="overallStatusCard">
+            <div class="card-body text-center">
+                <div id="overallStatus">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading system health...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Resources -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-cpu"></i> CPU Usage</h6>
+            </div>
+            <div class="card-body" id="cpuStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-memory"></i> Memory Usage</h6>
+            </div>
+            <div class="card-body" id="memoryStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-hdd"></i> Disk Usage</h6>
+            </div>
+            <div class="card-body" id="diskStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Services and Connectors -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> System Services</h6>
+            </div>
+            <div class="card-body" id="servicesStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-puzzle"></i> OSINT Connectors</h6>
+            </div>
+            <div class="card-body" id="connectorsStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tor and Database Status -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-shield-lock"></i> Tor Proxy Status</h6>
+            </div>
+            <div class="card-body" id="torStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-database"></i> Database Status</h6>
+            </div>
+            <div class="card-body" id="databaseStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Information -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> System Information</h6>
+            </div>
+            <div class="card-body" id="systemInfo">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-shield-check"></i> Security Status</h6>
+            </div>
+            <div class="card-body" id="securityStatus">
+                <div class="text-center">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.progress {
+    height: 20px;
+}
+
+.status-good {
+    color: #28a745;
+}
+
+.status-warning {
+    color: #ffc107;
+}
+
+.status-error, .status-critical {
+    color: #dc3545;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.indicator-good {
+    background-color: #28a745;
+}
+
+.indicator-warning {
+    background-color: #ffc107;
+}
+
+.indicator-error, .indicator-critical {
+    background-color: #dc3545;
+}
+
+.indicator-missing {
+    background-color: #6c757d;
+}
+
+.health-metric {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.health-metric:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+[data-theme="dark"] .health-metric {
+    border-bottom-color: #495057;
+}
+
+.metric-value {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.metric-label {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+[data-theme="dark"] .metric-label {
+    color: #adb5bd;
+}
+</style>
+
+<script>
+let healthData = null;
+let refreshInterval = null;
+
+function loadHealthData() {
+    const refreshButton = document.getElementById('refreshButton');
+    const refreshIcon = refreshButton.querySelector('i');
+    
+    // Show loading state
+    refreshIcon.className = 'bi bi-arrow-clockwise spin';
+    refreshButton.disabled = true;
+    
+    fetch('/api/system/health')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch health data');
+            }
+            return response.json();
+        })
+        .then(data => {
+            healthData = data;
+            updateHealthDisplay(data);
+            
+            // Update last updated time
+            const now = new Date();
+            document.getElementById('lastUpdated').textContent = `Updated: ${now.toLocaleTimeString()}`;
+        })
+        .catch(error => {
+            console.error('Error loading health data:', error);
+            showError('Failed to load system health data: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button state
+            refreshIcon.className = 'bi bi-arrow-clockwise';
+            refreshButton.disabled = false;
+        });
+}
+
+function updateHealthDisplay(data) {
+    updateOverallStatus(data);
+    updateResourcesStatus(data.resources);
+    updateServicesStatus(data.services);
+    updateConnectorsStatus(data.connectors);
+    updateTorStatus(data.tor);
+    updateDatabaseStatus(data.database);
+    updateSystemInfo(data.system);
+    updateSecurityStatus(data.security);
+}
+
+function updateOverallStatus(data) {
+    const container = document.getElementById('overallStatus');
+    const card = document.getElementById('overallStatusCard');
+    const status = data.overall_status;
+    
+    let statusIcon, statusText, cardClass;
+    
+    switch(status) {
+        case 'good':
+            statusIcon = 'bi-check-circle-fill';
+            statusText = 'System Healthy';
+            cardClass = 'border-success';
+            break;
+        case 'warning':
+            statusIcon = 'bi-exclamation-triangle-fill';
+            statusText = 'System Warning';
+            cardClass = 'border-warning';
+            break;
+        case 'critical':
+            statusIcon = 'bi-x-circle-fill';
+            statusText = 'System Critical';
+            cardClass = 'border-danger';
+            break;
+        default:
+            statusIcon = 'bi-question-circle-fill';
+            statusText = 'Unknown Status';
+            cardClass = 'border-secondary';
+    }
+    
+    card.className = `card ${cardClass}`;
+    
+    container.innerHTML = `
+        <i class="bi ${statusIcon} status-${status}" style="font-size: 3rem;"></i>
+        <h4 class="mt-2 status-${status}">${statusText}</h4>
+        <p class="text-muted">Last updated: ${new Date(data.timestamp).toLocaleString()}</p>
+    `;
+}
+
+function updateResourcesStatus(resources) {
+    updateResourceCard('cpuStatus', 'CPU', resources.cpu, '%');
+    updateResourceCard('memoryStatus', 'Memory', resources.memory, 'GB');
+    updateResourceCard('diskStatus', 'Disk', resources.disk, 'GB');
+}
+
+function updateResourceCard(containerId, type, resource, unit) {
+    const container = document.getElementById(containerId);
+    const percentage = type === 'CPU' ? resource.usage_percent : 
+                     type === 'Memory' ? resource.usage_percent :
+                     resource.usage_percent;
+    
+    const used = type === 'CPU' ? resource.usage_percent :
+                type === 'Memory' ? resource.used_gb :
+                resource.used_gb;
+    
+    const total = type === 'CPU' ? 100 :
+                 type === 'Memory' ? resource.total_gb :
+                 resource.total_gb;
+    
+    const available = type === 'CPU' ? (100 - resource.usage_percent) :
+                     type === 'Memory' ? resource.available_gb :
+                     resource.free_gb;
+    
+    let progressClass;
+    switch(resource.status) {
+        case 'good': progressClass = 'bg-success'; break;
+        case 'warning': progressClass = 'bg-warning'; break;
+        case 'critical': progressClass = 'bg-danger'; break;
+        default: progressClass = 'bg-secondary';
+    }
+    
+    container.innerHTML = `
+        <div class="health-metric">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="metric-label">Usage</span>
+                <span class="metric-value status-${resource.status}">${percentage}%</span>
+            </div>
+            <div class="progress mb-2">
+                <div class="progress-bar ${progressClass}" role="progressbar" 
+                     style="width: ${percentage}%" aria-valuenow="${percentage}" 
+                     aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <small class="text-muted">
+                Used: ${used}${unit} / Total: ${total}${unit}
+                ${type !== 'CPU' ? `<br>Available: ${available}${unit}` : ''}
+                ${type === 'CPU' ? `<br>Cores: ${resource.count} physical, ${resource.count_logical} logical` : ''}
+            </small>
+        </div>
+    `;
+}
+
+function updateServicesStatus(services) {
+    const container = document.getElementById('servicesStatus');
+    let html = '';
+    
+    for (const [name, service] of Object.entries(services)) {
+        const statusClass = getStatusClass(service.status);
+        html += `
+            <div class="health-metric d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="status-indicator indicator-${statusClass}"></span>
+                    <strong>${name.charAt(0).toUpperCase() + name.slice(1)}</strong>
+                    <br><small class="text-muted">${service.message}</small>
+                </div>
+                <span class="badge bg-${statusClass === 'good' ? 'success' : statusClass === 'warning' ? 'warning' : 'danger'}">
+                    ${service.status}
+                </span>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html || '<p class="text-muted">No services to monitor</p>';
+}
+
+function updateConnectorsStatus(connectors) {
+    const container = document.getElementById('connectorsStatus');
+    let html = '';
+    
+    for (const [name, connector] of Object.entries(connectors)) {
+        const statusClass = getStatusClass(connector.status);
+        html += `
+            <div class="health-metric d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="status-indicator indicator-${statusClass}"></span>
+                    <strong>${name.charAt(0).toUpperCase() + name.slice(1)}</strong>
+                    <br><small class="text-muted">${connector.message}</small>
+                </div>
+                <span class="badge bg-${statusClass === 'good' ? 'success' : statusClass === 'warning' ? 'warning' : 'danger'}">
+                    ${connector.status}
+                </span>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html || '<p class="text-muted">No connectors to monitor</p>';
+}
+
+function updateTorStatus(tor) {
+    const container = document.getElementById('torStatus');
+    
+    if (tor.status === 'error') {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Error: ${tor.message}
+            </div>
+        `;
+        return;
+    }
+    
+    const statusClass = getStatusClass(tor.status);
+    
+    container.innerHTML = `
+        <div class="health-metric">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>Status</span>
+                <span class="badge bg-${statusClass === 'good' ? 'success' : statusClass === 'warning' ? 'warning' : 'danger'}">
+                    ${tor.enabled ? (tor.running ? 'Running' : 'Stopped') : 'Disabled'}
+                </span>
+            </div>
+            ${tor.version ? `<div class="mb-2"><small class="text-muted">Version: ${tor.version}</small></div>` : ''}
+            ${tor.current_ip ? `
+                <div class="mb-2">
+                    <small class="text-muted">Exit IP: ${tor.current_ip}</small>
+                    ${tor.country ? `<br><small class="text-muted">Country: ${tor.country}</small>` : ''}
+                </div>
+            ` : ''}
+            ${tor.socks_port ? `<div class="mb-2"><small class="text-muted">SOCKS Port: ${tor.socks_port}</small></div>` : ''}
+            ${tor.control_port ? `<div class="mb-2"><small class="text-muted">Control Port: ${tor.control_port}</small></div>` : ''}
+            ${tor.circuits ? `<div class="mb-2"><small class="text-muted">Active Circuits: ${tor.circuits}</small></div>` : ''}
+            ${tor.error ? `<div class="text-danger"><small>Error: ${tor.error}</small></div>` : ''}
+        </div>
+    `;
+}
+
+function updateDatabaseStatus(database) {
+    const container = document.getElementById('databaseStatus');
+    
+    if (database.status === 'error') {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Error: ${database.message}
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="health-metric">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>Connection</span>
+                <span class="badge bg-success">Connected</span>
+            </div>
+            <div class="row text-center">
+                <div class="col-6">
+                    <div class="metric-value">${database.users}</div>
+                    <div class="metric-label">Users</div>
+                </div>
+                <div class="col-6">
+                    <div class="metric-value">${database.investigations}</div>
+                    <div class="metric-label">Investigations</div>
+                </div>
+            </div>
+            <div class="row text-center mt-2">
+                <div class="col-6">
+                    <div class="metric-value">${database.searches}</div>
+                    <div class="metric-label">Total Searches</div>
+                </div>
+                <div class="col-6">
+                    <div class="metric-value">${database.recent_searches_24h}</div>
+                    <div class="metric-label">Recent (24h)</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function updateSystemInfo(system) {
+    const container = document.getElementById('systemInfo');
+    
+    container.innerHTML = `
+        <div class="health-metric">
+            <div class="row">
+                <div class="col-6">
+                    <small class="text-muted">Platform:</small><br>
+                    <strong>${system.platform} ${system.platform_release}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Architecture:</small><br>
+                    <strong>${system.architecture}</strong>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-6">
+                    <small class="text-muted">Hostname:</small><br>
+                    <strong>${system.hostname}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Python:</small><br>
+                    <strong>${system.python_version}</strong>
+                </div>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted">Current Time:</small><br>
+                <strong>${system.current_time}</strong>
+            </div>
+        </div>
+    `;
+}
+
+function updateSecurityStatus(security) {
+    const container = document.getElementById('securityStatus');
+    
+    const items = [];
+    
+    // SSL/HTTPS check
+    items.push({
+        label: 'HTTPS Enabled',
+        value: security.ssl_enabled,
+        good: security.ssl_enabled,
+        icon: security.ssl_enabled ? 'bi-shield-check' : 'bi-shield-x'
+    });
+    
+    // Debug mode check
+    items.push({
+        label: 'Debug Mode',
+        value: security.debug_mode ? 'Enabled' : 'Disabled',
+        good: !security.debug_mode,
+        icon: security.debug_mode ? 'bi-bug' : 'bi-shield-check'
+    });
+    
+    // Root user check
+    items.push({
+        label: 'Running as Root',
+        value: security.running_as_root ? 'Yes' : 'No',
+        good: !security.running_as_root,
+        icon: security.running_as_root ? 'bi-exclamation-triangle' : 'bi-shield-check'
+    });
+    
+    let html = '';
+    items.forEach(item => {
+        const statusClass = item.good ? 'good' : 'warning';
+        html += `
+            <div class="health-metric d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi ${item.icon} status-${statusClass}"></i>
+                    <span class="ms-2">${item.label}</span>
+                </div>
+                <span class="badge bg-${item.good ? 'success' : 'warning'}">
+                    ${item.value}
+                </span>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function getStatusClass(status) {
+    switch(status) {
+        case 'running':
+        case 'available':
+        case 'connected':
+        case 'good':
+            return 'good';
+        case 'stopped':
+        case 'warning':
+            return 'warning';
+        case 'error':
+        case 'missing':
+        case 'critical':
+            return 'error';
+        default:
+            return 'warning';
+    }
+}
+
+function showError(message) {
+    const overallStatus = document.getElementById('overallStatus');
+    overallStatus.innerHTML = `
+        <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 3rem;"></i>
+        <h4 class="mt-2 text-danger">Error Loading Health Data</h4>
+        <p class="text-muted">${message}</p>
+        <button class="btn btn-primary" onclick="loadHealthData()">Retry</button>
+    `;
+}
+
+// Add CSS for spinning animation
+const style = document.createElement('style');
+style.textContent = `
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(style);
+
+// Load data when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadHealthData();
+    
+    // Auto-refresh every 30 seconds
+    refreshInterval = setInterval(loadHealthData, 30000);
+});
+
+// Clean up interval when leaving page
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+</script>
+{% endblock %}

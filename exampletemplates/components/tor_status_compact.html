@@ -1,0 +1,450 @@
+<!-- Compact Tor Status for Tool Pages -->
+<div class="card border-info mb-3">
+    <div class="card-header bg-info bg-opacity-10 py-2" style="cursor: pointer;" onclick="toggleTorDetails()" title="Click to show/hide Tor details">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-shield-lock me-2"></i>
+                    <span class="fw-bold">Tor Proxy</span>
+                    <div id="torCompactIndicator" class="ms-2">
+                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                    </div>
+                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="event.stopPropagation(); refreshCompactTorStatus(true);" title="Refresh Tor status">
+                        <i class="bi bi-arrow-clockwise text-muted" style="font-size: 0.7em;"></i>
+                    </button>
+                    <i id="torToggleIcon" class="bi bi-chevron-down ms-1 text-muted" style="font-size: 0.8em;"></i>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-switch mb-0" onclick="event.stopPropagation();">
+                    <input class="form-check-input" type="checkbox" id="useTorForSearch" disabled onclick="event.stopPropagation();">
+                    <label class="form-check-label" for="useTorForSearch" onclick="event.stopPropagation();">
+                        <small>Use for this search</small>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body py-2" id="torCompactBody" style="display: none;">
+        <div class="row">
+            <div class="col-md-6">
+                <small class="text-muted">Current IP:</small>
+                <div id="torCurrentIp" class="fw-bold">Loading...</div>
+            </div>
+            <div class="col-md-6">
+                <small class="text-muted">Country:</small>
+                <div id="torCurrentCountry">Loading...</div>
+            </div>
+        </div>
+        <div class="mt-2">
+            <button class="btn btn-sm btn-outline-primary" id="torNewCircuitBtn" onclick="requestCompactNewCircuit()" disabled>
+                <i class="bi bi-arrow-clockwise me-1"></i>New Circuit
+            </button>
+            <button class="btn btn-sm btn-outline-info" id="torCompactTestBtn" onclick="testCompactTorConnection()" style="display: none;">
+                <i class="bi bi-wifi me-1"></i>Test Connection
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleTorDetails()">
+                <i class="bi bi-eye me-1"></i>Details
+            </button>
+            <div id="torControlNote" class="mt-1" style="display: none;">
+                <small class="text-muted">Using system Tor (limited control)</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tor-status-compact .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 4px;
+}
+.status-connected { background-color: #28a745; }
+.status-running { background-color: #ffc107; }
+.status-disconnected { background-color: #dc3545; }
+.status-disabled { background-color: #6c757d; }
+.status-error { background-color: #fd7e14; }
+
+.card-header[onclick] {
+    transition: background-color 0.2s ease;
+}
+
+.card-header[onclick]:hover {
+    background-color: rgba(13, 202, 240, 0.2) !important;
+}
+</style>
+
+<script>
+let compactTorStatus = null;
+let torDetailsVisible = null; // Track if user explicitly set visibility (null = auto-show when working)
+
+// Initialize global Tor status cache (shared across all pages)
+if (!window.torStatusCache) {
+    window.torStatusCache = {
+        data: null,
+        lastFetch: 0,
+        maxAge: 30000, // 30 seconds
+        isValid() {
+            return this.data && (Date.now() - this.lastFetch) < this.maxAge;
+        },
+        set(data) {
+            this.data = data;
+            this.lastFetch = Date.now();
+            // Store in sessionStorage for persistence across page loads
+            try {
+                sessionStorage.setItem('torStatusCache', JSON.stringify({
+                    data: this.data,
+                    lastFetch: this.lastFetch
+                }));
+            } catch (e) {
+                // Ignore storage errors
+            }
+        },
+        restore() {
+            try {
+                const cached = sessionStorage.getItem('torStatusCache');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    this.data = parsed.data;
+                    this.lastFetch = parsed.lastFetch;
+                }
+            } catch (e) {
+                // Ignore storage errors
+            }
+        }
+    };
+}
+
+async function refreshCompactTorStatus(forceRefresh = false) {
+    const indicator = document.getElementById('torCompactIndicator');
+    const body = document.getElementById('torCompactBody');
+    const useTorSwitch = document.getElementById('useTorForSearch');
+    const newCircuitBtn = document.getElementById('torNewCircuitBtn');
+    
+    // Restore from sessionStorage on first load
+    if (!window.torStatusCache.data) {
+        window.torStatusCache.restore();
+    }
+    
+    try {
+        // Use cached data if available and not forcing refresh
+        if (!forceRefresh && window.torStatusCache.isValid()) {
+            console.log('🚀 Using cached Tor status (instant load)');
+            compactTorStatus = window.torStatusCache.data;
+            updateCompactTorDisplay(compactTorStatus);
+            return;
+        }
+        
+        // Show loading state only if no cached data exists
+        if (!window.torStatusCache.data) {
+            indicator.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+        } else {
+            // Show cached data while fetching fresh data
+            compactTorStatus = window.torStatusCache.data;
+            updateCompactTorDisplay(compactTorStatus);
+        }
+        
+        // Fetch fresh status
+        console.log('🔄 Fetching fresh Tor status...');
+        const response = await fetch('/api/tor/status');
+        if (!response.ok) {
+            throw new Error('Failed to fetch status');
+        }
+        
+        const freshData = await response.json();
+        
+        // Update cache and display
+        window.torStatusCache.set(freshData);
+        compactTorStatus = freshData;
+        updateCompactTorDisplay(compactTorStatus);
+        
+    } catch (error) {
+        console.error('Error fetching compact Tor status:', error);
+        
+        // Fall back to cached data if available
+        if (window.torStatusCache.data) {
+            console.log('⚠️ Using stale cached data due to fetch error');
+            compactTorStatus = window.torStatusCache.data;
+            updateCompactTorDisplay(compactTorStatus);
+        } else {
+            // No cached data available, show error
+            indicator.innerHTML = '<span class="status-dot status-error"></span>';
+            useTorSwitch.disabled = true;
+            newCircuitBtn.disabled = true;
+        }
+    }
+}
+
+function updateCompactTorDisplay(data) {
+    const indicator = document.getElementById('torCompactIndicator');
+    const body = document.getElementById('torCompactBody');
+    const useTorSwitch = document.getElementById('useTorForSearch');
+    const newCircuitBtn = document.getElementById('torNewCircuitBtn');
+    const currentIp = document.getElementById('torCurrentIp');
+    const currentCountry = document.getElementById('torCurrentCountry');
+    const controlNote = document.getElementById('torControlNote');
+    
+    // Update status indicator
+    let statusClass, isWorking = false;
+    if (!data.enabled) {
+        statusClass = 'status-disabled';
+    } else if (!data.running) {
+        statusClass = 'status-disconnected';
+    } else if (data.connection_tested === false) {
+        statusClass = 'status-running';
+        isWorking = true;  // Allow use even if not tested
+    } else if (data.connection_working) {
+        statusClass = 'status-connected';
+        isWorking = true;
+    } else {
+        statusClass = 'status-error';
+    }
+    
+    indicator.innerHTML = `<span class="status-dot ${statusClass}" title="${data.enabled ? (data.running ? 'Connected' : 'Disconnected') : 'Disabled'}"></span>`;
+    
+    // Enable/disable controls
+    useTorSwitch.disabled = !isWorking;
+    newCircuitBtn.disabled = !isWorking || !data.control_port;
+    
+    // Show/hide test connection button
+    const testBtn = document.getElementById('torCompactTestBtn');
+    if (testBtn) {
+        if (data.running && data.connection_tested === false && !data.current_ip) {
+            testBtn.style.display = 'inline-block';
+        } else {
+            testBtn.style.display = 'none';
+        }
+    }
+    
+    // Update details - show by default when Tor is working
+    if (isWorking) {
+        // Show details by default unless user explicitly hid them
+        if (torDetailsVisible !== false) {
+            body.style.display = 'block';
+            if (torDetailsVisible === null) {
+                torDetailsVisible = true; // Set to true on first successful load
+            }
+            const toggleIcon = document.getElementById('torToggleIcon');
+            if (toggleIcon) {
+                toggleIcon.className = 'bi bi-chevron-up ms-2 text-muted';
+            }
+        }
+        // Smart display logic for IP and country
+        const connectionTest = data.connection_test || {};
+        let displayIP, displayCountry;
+        
+        if (data.connection_tested === false) {
+            // Basic status - use cached data or show helpful message
+            if (data.current_ip) {
+                displayIP = data.current_ip;
+                displayCountry = data.country || 'Unknown location';
+            } else {
+                displayIP = 'Click "Test Connection"';
+                displayCountry = 'Click "Test Connection"';
+                currentIp.className = 'fw-bold text-info fst-italic';
+                currentCountry.className = 'text-info fst-italic';
+            }
+        } else {
+            // Connection tested - use test results or cached data
+            displayIP = connectionTest.ip_address || data.current_ip || 'Unknown';
+            displayCountry = connectionTest.country || data.country || 'Unknown';
+            currentIp.className = 'fw-bold';
+            currentCountry.className = '';
+        }
+        
+        currentIp.textContent = displayIP;
+        currentCountry.textContent = displayCountry;
+        
+        // Check if Tor is actually changing the IP (not same as server IP)
+        const serverIp = '174.112.56.244'; // Your server IP
+        if (displayIP === serverIp && displayIP !== 'Click "Test Connection"') {
+            currentIp.innerHTML = `${serverIp} <small class="text-warning">(Not routed)</small>`;
+        }
+        
+        // Show control status note
+        if (!data.control_port) {
+            controlNote.style.display = 'block';
+        } else {
+            controlNote.style.display = 'none';
+        }
+    } else {
+        body.style.display = 'none';
+        const toggleIcon = document.getElementById('torToggleIcon');
+        if (toggleIcon) {
+            toggleIcon.className = 'bi bi-chevron-down ms-2 text-muted';
+        }
+    }
+    
+    // Auto-enable switch if Tor is working (user preference)
+    if (isWorking && localStorage.getItem('preferTor') === 'true') {
+        useTorSwitch.checked = true;
+    }
+}
+
+async function requestCompactNewCircuit() {
+    const btn = document.getElementById('torNewCircuitBtn');
+    const originalText = btn.innerHTML;
+    
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Requesting...';
+        
+        const response = await fetch('/api/tor/control', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({ action: 'new_circuit' })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Refresh status after a moment
+            setTimeout(refreshCompactTorStatus, 3000);
+            
+            // Show brief success feedback
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Success';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            throw new Error(result.error || 'Failed to request new circuit');
+        }
+        
+    } catch (error) {
+        console.error('Error requesting new circuit:', error);
+        btn.innerHTML = '<i class="bi bi-x me-1"></i>Failed';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+
+function toggleTorDetails() {
+    // Toggle detailed view on current page instead of redirecting
+    const body = document.getElementById('torCompactBody');
+    const detailsBtn = document.querySelector('#torCompactBody button[onclick="toggleTorDetails()"]');
+    const toggleIcon = document.getElementById('torToggleIcon');
+    
+    if (body.style.display === 'none' || body.style.display === '') {
+        body.style.display = 'block';
+        torDetailsVisible = true;
+        if (detailsBtn) {
+            detailsBtn.innerHTML = '<i class="bi bi-eye-slash me-1"></i>Hide';
+        }
+        if (toggleIcon) {
+            toggleIcon.className = 'bi bi-chevron-up ms-2 text-muted';
+        }
+    } else {
+        body.style.display = 'none';
+        torDetailsVisible = false;
+        if (detailsBtn) {
+            detailsBtn.innerHTML = '<i class="bi bi-eye me-1"></i>Details';
+        }
+        if (toggleIcon) {
+            toggleIcon.className = 'bi bi-chevron-down ms-2 text-muted';
+        }
+    }
+}
+
+// Save user preference for using Tor
+document.getElementById('useTorForSearch')?.addEventListener('change', function() {
+    localStorage.setItem('preferTor', this.checked);
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshCompactTorStatus();
+    
+    // Auto-refresh every 3 minutes (less frequent for tool pages)
+    setInterval(refreshCompactTorStatus, 180000);
+});
+
+// Function to check if user wants to use Tor for current search
+function shouldUseTor() {
+    const checkbox = document.getElementById('useTorForSearch');
+    return checkbox && checkbox.checked && !checkbox.disabled;
+}
+
+async function testCompactTorConnection() {
+    const btn = document.getElementById('torCompactTestBtn');
+    const originalHTML = btn.innerHTML;
+    
+    try {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing...';
+        btn.disabled = true;
+        
+        const response = await fetch('/api/tor/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Connection test failed');
+        }
+        
+        const result = await response.json();
+        
+        // Update the cached data with test results
+        if (window.torStatusCache) {
+            window.torStatusCache.data.current_ip = result.ip_address;
+            window.torStatusCache.data.country = result.country;
+            window.torStatusCache.data.connection_tested = true;
+            window.torStatusCache.data.connection_working = result.connection_working;
+            window.torStatusCache.set(window.torStatusCache.data);
+        }
+        
+        // Update the current status object
+        compactTorStatus.current_ip = result.ip_address;
+        compactTorStatus.country = result.country;
+        compactTorStatus.connection_tested = true;
+        compactTorStatus.connection_working = result.connection_working;
+        
+        // Refresh the display
+        updateCompactTorDisplay(compactTorStatus);
+        
+        // Show success message
+        const message = result.connection_working 
+            ? `✅ ${result.ip_address} (${result.country || 'Unknown location'})`
+            : `❌ Test failed`;
+            
+        btn.innerHTML = message;
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 3000);
+        
+    } catch (error) {
+        console.error('Compact Tor connection test error:', error);
+        btn.innerHTML = `❌ Test failed`;
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }, 3000);
+    }
+}
+
+// Function to get Tor-enabled fetch options
+function getTorFetchOptions(options = {}) {
+    if (shouldUseTor()) {
+        // Add any Tor-specific headers or options here
+        return {
+            ...options,
+            headers: {
+                ...options.headers,
+                'X-Use-Tor': 'true'
+            }
+        };
+    }
+    return options;
+}
+</script>

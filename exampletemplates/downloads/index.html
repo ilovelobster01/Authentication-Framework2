@@ -1,0 +1,524 @@
+{% extends "base_new.html" %}
+
+{% block title %}Downloads - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-download"></i> Downloads</h2>
+        <p class="text-muted mb-0">Manage your downloaded files and history</p>
+    </div>
+    <div class="btn-group">
+        <a href="{{ url_for('main.video_downloader') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> New Download
+        </a>
+        <form method="post" action="{{ url_for('downloads.cleanup') }}" style="display: inline;">
+            <button type="submit" class="btn btn-outline-warning" 
+                    onclick="return confirm('Clean up expired downloads?')">
+                <i class="bi bi-trash"></i> Cleanup
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Quota Status -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-speedometer2"></i> Daily Quota</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Downloads Used</span>
+                    <span><strong>{{ quota.daily_downloads_used }} / {{ quota.max_daily_downloads }}</strong></span>
+                </div>
+                <div class="progress mb-2">
+                    {% set daily_percent = (quota.daily_downloads_used / quota.max_daily_downloads * 100) if quota.max_daily_downloads > 0 else 0 %}
+                    <div class="progress-bar {% if daily_percent > 80 %}bg-danger{% elif daily_percent > 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                         style="width: {{ daily_percent }}%"></div>
+                </div>
+                <small class="text-muted">{{ quota.daily_remaining }} downloads remaining today</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-hdd"></i> Storage Quota</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Storage Used</span>
+                    <span><strong>{{ quota.storage_used_mb }} / {{ quota.max_storage_mb }} MB</strong></span>
+                </div>
+                <div class="progress mb-2">
+                    {% set storage_percent = quota.storage_usage_percent %}
+                    <div class="progress-bar {% if storage_percent > 80 %}bg-danger{% elif storage_percent > 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                         style="width: {{ storage_percent }}%"></div>
+                </div>
+                <small class="text-muted">{{ quota.storage_remaining_mb }}MB remaining</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.total }}</h4>
+                <p class="mb-0">Total Downloads</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.by_status.get('completed', 0) }}</h4>
+                <p class="mb-0">Completed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.active }}</h4>
+                <p class="mb-0">Active</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.storage_used_mb }}</h4>
+                <p class="mb-0">MB Used</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TOR Statistics Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card bg-dark text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.tor_used }}</h4>
+                <p class="mb-0"><i class="bi bi-shield-lock"></i> TOR Downloads</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card bg-secondary text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.tor_recent }}</h4>
+                <p class="mb-0"><i class="bi bi-shield-lock"></i> TOR This Week</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-funnel"></i> Filters</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="all" {{ 'selected' if status_filter == 'all' }}>All Statuses</option>
+                    <option value="active" {{ 'selected' if status_filter == 'active' }}>Active</option>
+                    <option value="available" {{ 'selected' if status_filter == 'available' }}>Available</option>
+                    <option value="completed" {{ 'selected' if status_filter == 'completed' }}>Completed</option>
+                    <option value="failed" {{ 'selected' if status_filter == 'failed' }}>Failed</option>
+                    <option value="expired" {{ 'selected' if status_filter == 'expired' }}>Expired</option>
+                    <option value="cancelled" {{ 'selected' if status_filter == 'cancelled' }}>Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="type" class="form-label">Type</label>
+                <select name="type" id="type" class="form-select">
+                    <option value="all" {{ 'selected' if type_filter == 'all' }}>All Types</option>
+                    <option value="video" {{ 'selected' if type_filter == 'video' }}>Video</option>
+                    <option value="audio" {{ 'selected' if type_filter == 'audio' }}>Audio</option>
+                    <option value="image" {{ 'selected' if type_filter == 'image' }}>Image</option>
+                    <option value="document" {{ 'selected' if type_filter == 'document' }}>Document</option>
+                    <option value="other" {{ 'selected' if type_filter == 'other' }}>Other</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="investigation" class="form-label">Investigation</label>
+                <select name="investigation" id="investigation" class="form-select">
+                    <option value="all" {{ 'selected' if investigation_filter == 'all' }}>All Investigations</option>
+                    {% for investigation in investigations %}
+                    <option value="{{ investigation.id }}" {{ 'selected' if investigation_filter == investigation.id|string }}>
+                        {{ investigation.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary d-block">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Downloads List -->
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                <i class="bi bi-list-ul"></i> 
+                Downloads ({{ downloads.total }} total)
+            </h6>
+            {% if downloads.total > 0 %}
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" onclick="selectAll()">
+                    <i class="bi bi-check-all"></i> Select All
+                </button>
+                <button class="btn btn-outline-danger" onclick="deleteSelected()" id="deleteSelectedBtn" style="display: none;">
+                    <i class="bi bi-trash"></i> Delete Selected
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if downloads.items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th width="40">
+                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                        </th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Investigation</th>
+                        <th>TOR</th>
+                        <th>Status</th>
+                        <th>Size</th>
+                        <th>Created</th>
+                        <th>Expires</th>
+                        <th width="120">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for download in downloads.items %}
+                    <tr class="download-row" data-download-id="{{ download.id }}">
+                        <td>
+                            <input type="checkbox" class="download-checkbox" value="{{ download.id }}" onchange="updateSelectButtons()">
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {% if download.download_type.value == 'video' %}
+                                    <i class="bi bi-play-circle text-primary me-2"></i>
+                                {% elif download.download_type.value == 'audio' %}
+                                    <i class="bi bi-music-note text-success me-2"></i>
+                                {% elif download.download_type.value == 'image' %}
+                                    <i class="bi bi-image text-info me-2"></i>
+                                {% else %}
+                                    <i class="bi bi-file text-secondary me-2"></i>
+                                {% endif %}
+                                <div>
+                                    <div class="fw-semibold">
+                                        <a href="{{ url_for('downloads.view', download_id=download.id) }}" class="text-decoration-none">
+                                            {{ download.title or download.filename or 'Untitled' }}
+                                        </a>
+                                    </div>
+                                    {% if download.uploader %}
+                                    <small class="text-muted">by {{ download.uploader }}</small>
+                                    {% endif %}
+                                    {% if download.duration %}
+                                    <small class="text-muted"> • {{ download.duration_formatted }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if download.download_type.value == 'video' %}
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-play-circle"></i> Video
+                                </span>
+                            {% elif download.download_type.value == 'audio' %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-music-note"></i> Audio
+                                </span>
+                            {% elif download.download_type.value == 'image' %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-image"></i> Image
+                                </span>
+                            {% elif download.download_type.value == 'document' %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-file-text"></i> Document
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-file"></i> Other
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if download.investigation %}
+                                <a href="{{ url_for('investigations.view', id=download.investigation.id) }}" 
+                                   class="text-decoration-none" title="{{ download.investigation.name }}">
+                                    <span class="badge bg-outline-primary">
+                                        <i class="bi bi-folder"></i> {{ download.investigation.name[:20] }}{% if download.investigation.name|length > 20 %}...{% endif %}
+                                    </span>
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if download.use_tor %}
+                                <span class="badge bg-dark">
+                                    <i class="bi bi-shield-lock"></i> TOR
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if download.status.value == 'completed' %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Completed
+                                </span>
+                            {% elif download.status.value == 'downloading' %}
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-download"></i> Downloading
+                                    {% if download.progress_percent and download.progress_percent > 0 %}
+                                        ({{ download.progress_percent }}%)
+                                    {% endif %}
+                                </span>
+                            {% elif download.status.value == 'queued' %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-clock"></i> Queued
+                                    {% if download.queue_position %}
+                                        (#{{ download.queue_position }})
+                                    {% endif %}
+                                </span>
+                            {% elif download.status.value == 'analyzing' %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-search"></i> Analyzing
+                                </span>
+                            {% elif download.status.value == 'pending' %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-hourglass"></i> Pending
+                                </span>
+                            {% elif download.status.value == 'failed' %}
+                                <span class="badge bg-danger">
+                                    <i class="bi bi-x-circle"></i> Failed
+                                </span>
+                            {% elif download.status.value == 'expired' %}
+                                <span class="badge bg-dark">
+                                    <i class="bi bi-clock-history"></i> Expired
+                                </span>
+                            {% elif download.status.value == 'cancelled' %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-stop-circle"></i> Cancelled
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if download.file_size %}
+                                {{ download.file_size_mb }} MB
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ download.created_at.strftime('%Y-%m-%d %H:%M') if download.created_at else 'Unknown' }}
+                            </small>
+                        </td>
+                        <td>
+                            {% if download.expires_at %}
+                                <small class="{% if download.is_expired %}text-danger{% elif download.time_remaining and download.time_remaining.days < 1 %}text-warning{% else %}text-muted{% endif %}">
+                                    {{ download.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                                </small>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                {% if download.is_available %}
+                                    {% if download.download_id and download.download_id.startswith('vd_') %}
+                                        <!-- Video download - use video downloader API -->
+                                        <a href="/api/video-downloader/download-file/{{ download.download_id }}" 
+                                           class="btn btn-outline-primary" title="Download File" target="_blank">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    {% else %}
+                                        <!-- Regular download - use downloads route -->
+                                        <a href="{{ url_for('downloads.download_file', download_id=download.id) }}" 
+                                           class="btn btn-outline-primary" title="Download File">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                                
+                                {% if download.is_active %}
+                                    <form method="post" action="{{ url_for('downloads.cancel', download_id=download.id) }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-outline-warning" title="Cancel"
+                                                onclick="return confirm('Cancel this download?')">
+                                            <i class="bi bi-stop"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                
+                                <form method="post" action="{{ url_for('downloads.delete', download_id=download.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete"
+                                            onclick="return confirm('Delete this download?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if downloads.pages > 1 %}
+        <nav aria-label="Downloads pagination">
+            <ul class="pagination justify-content-center">
+                {% if downloads.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('downloads.index', page=downloads.prev_num, status=status_filter, type=type_filter, investigation=investigation_filter) }}">
+                            <i class="bi bi-chevron-left"></i> Previous
+                        </a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in downloads.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != downloads.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('downloads.index', page=page_num, status=status_filter, type=type_filter, investigation=investigation_filter) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if downloads.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('downloads.index', page=downloads.next_num, status=status_filter, type=type_filter, investigation=investigation_filter) }}">
+                            Next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-download display-1 text-muted"></i>
+            <h5 class="mt-3">No downloads found</h5>
+            <p class="text-muted">
+                {% if status_filter != 'all' or type_filter != 'all' or investigation_filter != 'all' %}
+                    Try adjusting your filters or <a href="{{ url_for('downloads.index') }}">view all downloads</a>.
+                {% else %}
+                    Start by <a href="{{ url_for('main.video_downloader') }}">downloading your first video</a>.
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.download-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateSelectButtons();
+}
+
+function selectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    selectAllCheckbox.checked = true;
+    toggleSelectAll();
+}
+
+function updateSelectButtons() {
+    const selectedCheckboxes = document.querySelectorAll('.download-checkbox:checked');
+    const deleteBtn = document.getElementById('deleteSelectedBtn');
+    
+    if (selectedCheckboxes.length > 0) {
+        deleteBtn.style.display = 'inline-block';
+    } else {
+        deleteBtn.style.display = 'none';
+    }
+}
+
+function deleteSelected() {
+    const selectedCheckboxes = document.querySelectorAll('.download-checkbox:checked');
+    const downloadIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+    
+    if (downloadIds.length === 0) {
+        alert('No downloads selected');
+        return;
+    }
+    
+    if (!confirm(`Delete ${downloadIds.length} selected download(s)?`)) {
+        return;
+    }
+    
+    // Submit deletion requests
+    const promises = downloadIds.map(id => {
+        const form = new FormData();
+        return fetch(`/downloads/${id}/delete`, {
+            method: 'POST',
+            body: form,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        });
+    });
+    
+    Promise.all(promises).then(() => {
+        location.reload();
+    }).catch(error => {
+        console.error('Error deleting downloads:', error);
+        alert('Error deleting some downloads');
+    });
+}
+
+// Auto-refresh for active downloads
+document.addEventListener('DOMContentLoaded', function() {
+    const activeDownloads = document.querySelectorAll('.badge.bg-primary, .badge.bg-warning, .badge.bg-info, .badge.bg-secondary');
+    
+    if (activeDownloads.length > 0) {
+        // Refresh page every 10 seconds if there are active downloads
+        setTimeout(() => {
+            location.reload();
+        }, 10000);
+    }
+});
+</script>
+
+{% endblock %}

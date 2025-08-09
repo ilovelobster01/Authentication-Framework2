@@ -1,0 +1,311 @@
+{% extends "base_new.html" %}
+
+{% block title %}Edit {{ user.username }} - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pencil"></i> Edit User: {{ user.username }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                                {{ form.username(class="form-control") }}
+                                {% if form.username.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.username.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
+                                {{ form.email(class="form-control") }}
+                                {% if form.email.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.email.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="first_name" class="form-label">First Name</label>
+                                {{ form.first_name(class="form-control") }}
+                                {% if form.first_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.first_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="last_name" class="form-label">Last Name</label>
+                                {{ form.last_name(class="form-control") }}
+                                {% if form.last_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.last_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="organization" class="form-label">Organization</label>
+                        {{ form.organization(class="form-control") }}
+                        {% if form.organization.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.organization.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="roles" class="form-label">Role <span class="text-danger">*</span></label>
+                                {{ form.roles(class="form-select") }}
+                                {% if form.roles.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.roles.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check mt-4">
+                                    {{ form.active(class="form-check-input") }}
+                                    <label class="form-check-label" for="active">
+                                        Account Active
+                                    </label>
+                                </div>
+                                <div class="form-text">User can login when active</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Password Reset Section -->
+                    <div class="card bg-light mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-key"></i> Reset Password</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="new_password" class="form-label">New Password</label>
+                                        {{ form.new_password(class="form-control", type="password", placeholder="Leave blank to keep current password") }}
+                                        {% if form.new_password.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.new_password.errors %}{{ error }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">Minimum 8 characters</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="confirm_password" class="form-label">Confirm New Password</label>
+                                        {{ form.confirm_password(class="form-control", type="password", placeholder="Confirm new password") }}
+                                        {% if form.confirm_password.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.confirm_password.errors %}{{ error }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to User
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="updateUserBtn">
+                            <span class="btn-text">
+                                <i class="bi bi-check-lg"></i> Update User
+                            </span>
+                            <span class="btn-loading d-none">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                Updating...
+                            </span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- User Activity Summary -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-activity"></i> User Activity Summary</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h5 class="text-primary">{{ user.investigations.count() }}</h5>
+                            <small class="text-muted">Investigations</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h5 class="text-success">{{ user.searches.count() }}</h5>
+                            <small class="text-muted">Searches</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h5 class="text-info">{{ user.login_count or 0 }}</h5>
+                            <small class="text-muted">Total Logins</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h5 class="text-warning">
+                            {% if user.last_login_at %}
+                                {{ user.last_login_at.strftime('%m/%d') }}
+                            {% else %}
+                                Never
+                            {% endif %}
+                        </h5>
+                        <small class="text-muted">Last Login</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Account Status -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-shield-check"></i> Account Status</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Account Information</h6>
+                        <ul class="list-unstyled">
+                            <li>
+                                <strong>Status:</strong> 
+                                {% if user.active %}
+                                    <span class="text-success">Active</span>
+                                {% else %}
+                                    <span class="text-danger">Inactive</span>
+                                {% endif %}
+                            </li>
+                            <li>
+                                <strong>Email Confirmed:</strong>
+                                {% if user.confirmed_at %}
+                                    <span class="text-success">Yes ({{ user.confirmed_at.strftime('%Y-%m-%d') }})</span>
+                                {% else %}
+                                    <span class="text-warning">No</span>
+                                {% endif %}
+                            </li>
+                            <li><strong>Created:</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+                            <li><strong>Updated:</strong> {{ user.updated_at.strftime('%Y-%m-%d %H:%M') }}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Current Permissions</h6>
+                        <ul class="list-unstyled">
+                            {% set tools = available_tools %}
+                            {% for tool in tools %}
+                                <li>
+                                    {% if user.has_permission(tool) %}
+                                        <i class="bi bi-check-circle text-success"></i>
+                                    {% else %}
+                                        <i class="bi bi-x-circle text-danger"></i>
+                                    {% endif %}
+                                    {{ tool.title() }}
+                                </li>
+                            {% endfor %}
+                            <li>
+                                {% if user.is_admin %}
+                                    <i class="bi bi-shield-check text-warning"></i>
+                                {% else %}
+                                    <i class="bi bi-x-circle text-danger"></i>
+                                {% endif %}
+                                Admin Access
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Show warning when changing role
+document.getElementById('roles').addEventListener('change', function() {
+    const originalRole = '{{ user.roles[0].name if user.roles else "" }}';
+    if (this.value !== originalRole && originalRole) {
+        const alert = document.getElementById('role-change-alert');
+        if (!alert) {
+            const div = document.createElement('div');
+            div.id = 'role-change-alert';
+            div.className = 'alert alert-warning mt-2';
+            div.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Changing the role will affect user permissions and access to tools.';
+            this.parentNode.appendChild(div);
+        }
+    } else {
+        const alert = document.getElementById('role-change-alert');
+        if (alert) {
+            alert.remove();
+        }
+    }
+});
+
+// Show warning when deactivating account
+document.getElementById('active').addEventListener('change', function() {
+    if (!this.checked) {
+        const alert = document.getElementById('deactivate-alert');
+        if (!alert) {
+            const div = document.createElement('div');
+            div.id = 'deactivate-alert';
+            div.className = 'alert alert-warning mt-2';
+            div.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Deactivating this account will prevent the user from logging in.';
+            this.parentNode.appendChild(div);
+        }
+    } else {
+        const alert = document.getElementById('deactivate-alert');
+        if (alert) {
+            alert.remove();
+        }
+    }
+});
+
+// Simple form submission feedback
+document.addEventListener('DOMContentLoaded', function() {
+    const updateBtn = document.getElementById('updateUserBtn');
+    if (updateBtn) {
+        const btnText = updateBtn.querySelector('.btn-text');
+        const btnLoading = updateBtn.querySelector('.btn-loading');
+        
+        updateBtn.closest('form').addEventListener('submit', function() {
+            btnText.classList.add('d-none');
+            btnLoading.classList.remove('d-none');
+            updateBtn.disabled = true;
+        });
+    }
+});
+</script>
+{% endblock %}

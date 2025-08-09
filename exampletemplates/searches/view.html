@@ -1,0 +1,318 @@
+{% extends "base_new.html" %}
+
+{% block title %}Search Details - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-search"></i> Search Details</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('searches.index') }}">Searches</a></li>
+                <li class="breadcrumb-item active">{{ search.tool_name.title() }} Search</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="btn-group">
+        {% if search.investigation %}
+        <a href="{{ url_for('investigations.view', id=search.investigation.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-folder2-open"></i> View Investigation
+        </a>
+        {% endif %}
+        <a href="{{ url_for('searches.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Searches
+        </a>
+    </div>
+</div>
+
+<!-- Search Information -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Search Information</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <table class="table table-borderless">
+                    <tr>
+                        <td><strong>Tool:</strong></td>
+                        <td><span class="badge bg-secondary">{{ search.tool_name.title() }}</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Query:</strong></td>
+                        <td><code>{{ search.search_query }}</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status:</strong></td>
+                        <td>
+                            {% if search.status.value == 'completed' %}
+                            <span class="badge bg-success">✓ Completed</span>
+                            {% elif search.status.value == 'running' %}
+                            <span class="badge bg-warning">⏳ Running</span>
+                            {% elif search.status.value == 'failed' %}
+                            <span class="badge bg-danger">✗ Failed</span>
+                            {% elif search.status.value == 'cancelled' %}
+                            <span class="badge bg-secondary">🚫 Cancelled</span>
+                            {% else %}
+                            <span class="badge bg-info">{{ search.status.value.title() }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Investigation:</strong></td>
+                        <td>
+                            {% if search.investigation %}
+                            <a href="{{ url_for('investigations.view', id=search.investigation.id) }}">
+                                {{ search.investigation.name }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">Not assigned</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <table class="table table-borderless">
+                    <tr>
+                        <td><strong>Created:</strong></td>
+                        <td>{{ search.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</td>
+                    </tr>
+                    {% if search.started_at %}
+                    <tr>
+                        <td><strong>Started:</strong></td>
+                        <td>{{ search.started_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</td>
+                    </tr>
+                    {% endif %}
+                    {% if search.completed_at %}
+                    <tr>
+                        <td><strong>Completed:</strong></td>
+                        <td>{{ search.completed_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</td>
+                    </tr>
+                    {% endif %}
+                    {% if search.duration_seconds %}
+                    <tr>
+                        <td><strong>Duration:</strong></td>
+                        <td>
+                            {% set mins = (search.duration_seconds // 60)|int %}
+                            {% set secs = (search.duration_seconds % 60)|int %}
+                            {% if mins > 0 %}{{ mins }}m {% endif %}{{ secs }}s
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td><strong>{% if search.tool_name == 'holehe' %}Accounts Found:{% else %}Results Count:{% endif %}</strong></td>
+                        <td>
+                            {% if search.results_count %}
+                            <span class="badge bg-info">{{ search.results_count }}</span>
+                            {% else %}
+                            <span class="text-muted">0</span>
+                            {% endif %}
+                            {% if search.tool_name == 'holehe' and search.results %}
+                            <br><small class="text-muted">{{ search.results | length }} platforms scanned</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        {% if search.error_message %}
+        <div class="alert alert-danger mt-3">
+            <h6><i class="bi bi-exclamation-triangle"></i> Error Details</h6>
+            <pre class="mb-0">{{ search.error_message }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Results Section -->
+{% if search.results and search.status.value == 'completed' %}
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Search Results</h5>
+            <div>
+                {% if search.results_count > 0 %}
+                <span class="badge bg-primary">{{ search.results_count }} results</span>
+                {% endif %}
+                <a href="{{ url_for('searches.view_results', id=search.id) }}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-eye"></i> Detailed View
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if search.tool_name == 'holehe' %}
+        <!-- Holehe Results -->
+        <!-- Variables are already processed in the route -->
+        
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h4>{{ found_results | length }}</h4>
+                        <p class="mb-0">Accounts Found</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body text-center">
+                        <h4>{{ not_found | length }}</h4>
+                        <p class="mb-0">Not Found</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <h4>{{ rate_limited | length }}</h4>
+                        <p class="mb-0">Rate Limited</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if found_results %}
+        <h6 class="text-success"><i class="bi bi-check-circle"></i> Accounts Found</h6>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Platform</th>
+                        <th>Status</th>
+                        <th>Additional Info</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in found_results %}
+                    <tr>
+                        <td><strong>{{ result.platform }}</strong></td>
+                        <td><span class="badge bg-success">Account Found</span></td>
+                        <td>
+                            {% if result.email_recovery %}
+                            <small class="text-muted">Recovery: {{ result.email_recovery }}</small><br>
+                            {% endif %}
+                            {% if result.phone_number %}
+                            <small class="text-muted">Phone: {{ result.phone_number }}</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        {% elif search.tool_name == 'sherlock' %}
+        <!-- Sherlock Results -->
+        <p>Found {{ found_results | length }} social media profiles for username: <strong>{{ search.search_query }}</strong></p>
+        <div class="row">
+            {% for result in found_results[:10] %}
+            <div class="col-md-6 mb-2">
+                <div class="card">
+                    <div class="card-body py-2">
+                        <h6 class="card-title mb-1">
+                            {% if result.platform and result.platform != 'unknown' and result.platform != 'Unknown' %}
+                                {{ result.platform }}
+                            {% elif result.site and result.site != 'unknown' and result.site != 'Unknown' %}
+                                {{ result.site }}
+                            {% else %}
+                                {# Extract platform name from URL as fallback #}
+                                {% set url_parts = result.url.replace('https://', '').replace('http://', '').replace('www.', '').split('/') %}
+                                {% set domain_parts = url_parts[0].split('.') %}
+                                {{ domain_parts[0]|title if domain_parts else 'Unknown Platform' }}
+                            {% endif %}
+                        </h6>
+                        <a href="{{ result.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-box-arrow-up-right"></i> View Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if found_results | length > 10 %}
+        <p class="text-muted mt-2">Showing first 10 results. <a href="{{ url_for('searches.view_results', id=search.id) }}">View all {{ found_results | length }} results</a></p>
+        {% endif %}
+        
+        {% else %}
+        <!-- Generic Results -->
+        <div class="alert alert-info">
+            <p class="mb-0">{{ search.results_count }} results found. <a href="{{ url_for('searches.view_results', id=search.id) }}">Click here to view detailed results</a>.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% elif search.status.value == 'running' %}
+<div class="card">
+    <div class="card-body text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h5 class="mt-3">Search in Progress</h5>
+        <p class="text-muted">Please wait while we process your {{ search.tool_name }} search...</p>
+    </div>
+</div>
+{% elif search.status.value == 'pending' %}
+<div class="card">
+    <div class="card-body text-center">
+        <i class="bi bi-clock fs-1 text-info"></i>
+        <h5 class="mt-3">Search Queued</h5>
+        <p class="text-muted">Your search is in the queue and will be processed shortly.</p>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center">
+        <i class="bi bi-exclamation-circle fs-1 text-warning"></i>
+        <h5 class="mt-3">No Results Available</h5>
+        <p class="text-muted">This search has not completed successfully or has no results to display.</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Actions -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="btn-group me-2">
+                    {% if search.status.value in ['failed', 'cancelled'] %}
+                    <form method="POST" action="{{ url_for('searches.retry', id=search.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-arrow-clockwise"></i> Retry Search
+                        </button>
+                    </form>
+                    {% elif search.status.value == 'running' %}
+                    <form method="POST" action="{{ url_for('searches.cancel', id=search.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to cancel this search?')">
+                            <i class="bi bi-stop-circle"></i> Cancel Search
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                
+                <div class="btn-group">
+                    {% if search.status.value == 'completed' and search.results %}
+                    <a href="{{ url_for('searches.view_results', id=search.id) }}" class="btn btn-info">
+                        <i class="bi bi-list-ul"></i> View Full Results
+                    </a>
+                    {% endif %}
+                    
+                    <form method="POST" action="{{ url_for('searches.delete', id=search.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this search? This action cannot be undone.')">
+                            <i class="bi bi-trash"></i> Delete Search
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

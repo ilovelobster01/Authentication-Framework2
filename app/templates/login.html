@@ -1,0 +1,23 @@
+{% extends 'layout.html' %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<h1>Login</h1>
+<form id="login-form">
+  <p>
+    <label>Username<br><input type="text" id="username" /></label>
+  </p>
+  <p>
+    <label>Password<br><input type="password" id="password" /></label>
+  </p>
+  <button type="button" id="btn-login">Login</button>
+</form>
+
+<form id="totp-form" class="hidden">
+  <p>
+    <label>Authenticator code<br><input type="text" id="totp" /></label>
+  </p>
+  <button type="button" id="btn-verify-totp">Verify</button>
+</form>
+
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+{% endblock %}

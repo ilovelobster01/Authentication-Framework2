@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+{% block title %}Certificate Management{% endblock %}
+{% block content %}
+<h1>Certificate Management</h1>
+
+<h2>Issue new client certificate</h2>
+<form method="post" action="{{ url_for('admin.issue_cert') }}">
+  {{ form.hidden_tag() }}
+  <p>
+    {{ form.username.label }}<br>
+    {{ form.username(size=32) }}
+  </p>
+  <p>
+    {{ form.email.label }}<br>
+    {{ form.email(size=48) }}
+  </p>
+  <p>
+    {{ form.p12_password.label }}<br>
+    {{ form.p12_password(size=32) }}
+  </p>
+  <p>
+    {{ form.ca_password.label }}<br>
+    {{ form.ca_password(size=32) }}
+  </p>
+  <p>{{ form.submit() }}</p>
+</form>
+
+{% if issued %}
+  <h3>Issued for {{ issued.username }}</h3>
+  <ul>
+    <li>Download: <a href="{{ url_for('admin.download_cert', username=issued.username, kind='p12') }}">{{ issued.username }}.p12</a></li>
+    <li>CRT: <a href="{{ url_for('admin.download_cert', username=issued.username, kind='crt') }}">{{ issued.username }}.crt</a></li>
+  </ul>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,245 @@
+{% extends "base_new.html" %}
+
+{% block title %}Admin Dashboard - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-shield-lock"></i> Admin Dashboard</h2>
+    <div class="badge bg-danger">Administrator Access</div>
+</div>
+
+<!-- System Overview -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.total_users }}</h4>
+                        <p class="mb-0">Total Users</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-people fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.active_users }}</h4>
+                        <p class="mb-0">Active Users</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-person-check fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.total_searches }}</h4>
+                        <p class="mb-0">Total Searches</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-search fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ stats.total_investigations }}</h4>
+                        <p class="mb-0">Investigations</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-folder2 fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.users') }}" class="btn btn-outline-primary w-100 mb-2">
+                            <i class="bi bi-people"></i><br>
+                            Manage Users
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.system_config') }}" class="btn btn-outline-secondary w-100 mb-2">
+                            <i class="bi bi-gear"></i><br>
+                            System Config
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-outline-info w-100 mb-2">
+                            <i class="bi bi-list-ul"></i><br>
+                            Audit Logs
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.task_management') }}" class="btn btn-outline-warning w-100 mb-2">
+                            <i class="bi bi-gear-fill"></i><br>
+                            Task Management
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('system.health') }}" class="btn btn-outline-success w-100 mb-2">
+                            <i class="bi bi-heart-pulse"></i><br>
+                            System Health
+                        </a>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.roles') }}" class="btn btn-outline-warning w-100 mb-2">
+                            <i class="bi bi-shield-check"></i><br>
+                            Manage Roles
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.users', status='inactive') }}" class="btn btn-outline-danger w-100 mb-2">
+                            <i class="bi bi-person-x"></i><br>
+                            Inactive Users
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.users', status='active') }}" class="btn btn-outline-success w-100 mb-2">
+                            <i class="bi bi-person-check"></i><br>
+                            Active Users
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.fail2ban_dashboard') }}" class="btn btn-outline-danger w-100 mb-2">
+                            <i class="bi bi-shield-exclamation"></i><br>
+                            Fail2Ban Security
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.users') }}?q=" class="btn btn-outline-primary w-100 mb-2">
+                            <i class="bi bi-search"></i><br>
+                            Search Users
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-clock-history"></i> Recent User Activity</h6>
+            </div>
+            <div class="card-body">
+                {% if recent_activity %}
+                <div class="list-group list-group-flush">
+                    {% for activity in recent_activity %}
+                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">{{ activity.username }}</div>
+                            {{ activity.event_description }}
+                        </div>
+                        <small class="text-muted">{{ activity.created_at.strftime('%H:%M') }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center">No recent activity</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> System Alerts</h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success" role="alert">
+                    <i class="bi bi-check-circle"></i> All systems operational
+                </div>
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle"></i> Database backup completed successfully
+                </div>
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i> Tor proxy performance slightly degraded
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Information -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> System Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Application Version:</strong></td>
+                                <td>{{ config.APP_VERSION }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Database:</strong></td>
+                                <td>SQLite (Development)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cache:</strong></td>
+                                <td>Redis</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Uptime:</strong></td>
+                                <td>{{ uptime }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Environment:</strong></td>
+                                <td>Development</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Debug Mode:</strong></td>
+                                <td>Enabled</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

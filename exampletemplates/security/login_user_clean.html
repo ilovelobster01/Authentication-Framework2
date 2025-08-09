@@ -1,0 +1,116 @@
+{% extends "security/base.html" %}
+
+{% block title %}Login - {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                
+                <!-- Certificate Authentication Status -->
+                {% if session.get('cert_validated') %}
+                <div class="alert alert-success mb-4" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-shield-check-fill me-3" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <h6 class="mb-1 fw-bold">Certificate Authentication Verified</h6>
+                            <small>
+                                Your client certificate has been validated. Please complete login with your credentials.
+                                <br><strong>Certificate Serial:</strong> {{ session.get('cert_serial', 'Unknown') }}
+                                <br><strong>User:</strong> {{ session.get('cert_username', 'Unknown') }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="text-center mb-4">
+                    <h3 class="fw-normal">Welcome Back</h3>
+                    <p class="text-muted">Sign in to access your account</p>
+                </div>
+
+                <form action="{{ url_for_security('login') }}" method="post" name="login_user_form">
+                    {{ login_user_form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">
+                            <i class="bi bi-person"></i> Username or Email
+                        </label>
+                        {{ login_user_form.email(class="form-control form-control-lg", placeholder="Enter your username or email") }}
+                        {% if login_user_form.email.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in login_user_form.email.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            <i class="bi bi-lock"></i> Password
+                        </label>
+                        {{ login_user_form.password(class="form-control form-control-lg", placeholder="Enter your password") }}
+                        {% if login_user_form.password.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in login_user_form.password.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- 2FA Code Field (always visible but optional) -->
+                    <div class="mb-3">
+                        <label for="twofactor" class="form-label">
+                            <i class="bi bi-shield-lock"></i> 2FA Code <small class="text-muted">(if enabled)</small>
+                        </label>
+                        <input type="text" class="form-control form-control-lg" name="twofactor" id="twofactor" 
+                               placeholder="Enter 6-digit code from authenticator app" maxlength="6" pattern="[0-9]{6}">
+                        <small class="form-text text-muted">Leave blank if you don't have 2FA enabled</small>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        {{ login_user_form.remember_me(class="form-check-input") }}
+                        <label class="form-check-label" for="remember_me">
+                            Remember me
+                        </label>
+                    </div>
+                    
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right"></i> Sign In
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Certificate Info -->
+                <div class="text-center mt-4">
+                    <small class="text-muted">
+                        <i class="bi bi-shield-check"></i> 
+                        This system requires a valid client certificate for access
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    border-radius: 15px;
+}
+
+.form-control-lg {
+    border-radius: 8px;
+}
+
+.btn-lg {
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.alert {
+    border-radius: 10px;
+    border: none;
+}
+</style>
+{% endblock %}

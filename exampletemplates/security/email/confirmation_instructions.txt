@@ -1,0 +1,15 @@
+Welcome to TIOS Web Toolkit!
+
+Thank you for registering an account with us. To complete your registration and activate your account, please click the link below:
+
+{{ confirmation_link }}
+
+This link will expire in 5 days. If you did not create an account on our platform, please ignore this email.
+
+For security reasons, this confirmation link can only be used once. If you have any issues with account activation, please contact our support team.
+
+Best regards,
+The TIOS Team
+
+---
+This is an automated message. Please do not reply to this email.

@@ -1,0 +1,452 @@
+{% extends "base_new.html" %}
+
+{% block title %}Edit {{ role.name }} Role - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pencil"></i> Edit Role: {{ role.name }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-info-circle"></i> Role Information
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Role Name <span class="text-danger">*</span></label>
+                                    {{ form.name(class="form-control") }}
+                                    {% if form.name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.name.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description</label>
+                                    {{ form.description(class="form-control") }}
+                                    {% if form.description.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.description.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Tool Permissions -->
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-tools"></i> Tool Permissions
+                        </h6>
+                        <p class="text-muted mb-3">Select which OSINT tools users with this role can access:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.holehe(class="form-check-input") }}
+                                            <label class="form-check-label" for="holehe">
+                                                <strong>Holehe</strong>
+                                                <span class="badge bg-success ms-2">Basic</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Email OSINT tool for checking if an email is registered on different websites
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.sherlock(class="form-check-input") }}
+                                            <label class="form-check-label" for="sherlock">
+                                                <strong>Sherlock</strong>
+                                                <span class="badge bg-primary ms-2">Standard</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Username OSINT tool for finding usernames across social networks
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.instaloader(class="form-check-input") }}
+                                            <label class="form-check-label" for="instaloader">
+                                                <strong>Instaloader</strong>
+                                                <span class="badge bg-warning ms-2">Advanced</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Instagram OSINT tool for downloading and analyzing Instagram content
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.telegram(class="form-check-input") }}
+                                            <label class="form-check-label" for="telegram">
+                                                <strong>Telegram OSINT</strong>
+                                                <span class="badge bg-info ms-2">Standard</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Telegram OSINT tool for gathering information from Telegram
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.ghunt(class="form-check-input") }}
+                                            <label class="form-check-label" for="ghunt">
+                                                <strong>GHunt</strong>
+                                                <span class="badge bg-danger ms-2">Expert</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Google account investigation tool for advanced OSINT research
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch">
+                                            {{ form.video_downloader(class="form-check-input") }}
+                                            <label class="form-check-label" for="video_downloader">
+                                                <strong>Video Downloader</strong>
+                                                <span class="badge bg-info ms-2">Standard</span>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">
+                                            Download videos from YouTube, Vimeo, TikTok, and 1000+ other platforms
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Download Quota Settings -->
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-download"></i> Download Quota Settings
+                        </h6>
+                        <p class="text-muted mb-3">Configure download limits for video downloader tool:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_daily_downloads" class="form-label">Daily Downloads</label>
+                                    {{ form.max_daily_downloads(class="form-control") }}
+                                    {% if form.max_daily_downloads.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_daily_downloads.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Max downloads per day</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_storage_mb" class="form-label">Storage (MB)</label>
+                                    {{ form.max_storage_mb(class="form-control") }}
+                                    {% if form.max_storage_mb.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_storage_mb.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Max storage space</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_retention_days" class="form-label">Retention (Days)</label>
+                                    {{ form.max_retention_days(class="form-control") }}
+                                    {% if form.max_retention_days.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_retention_days.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">How long to keep files</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="max_file_size_mb" class="form-label">Max File Size (MB)</label>
+                                    {{ form.max_file_size_mb(class="form-control") }}
+                                    {% if form.max_file_size_mb.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.max_file_size_mb.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Max size per file</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Quota Presets:</strong>
+                            <div class="d-flex gap-2 flex-wrap mt-2">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="setQuotaPreset('basic')">
+                                    Basic (3/256MB/3d/100MB)
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="setQuotaPreset('standard')">
+                                    Standard (10/1GB/7d/500MB)
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="setQuotaPreset('analyst')">
+                                    Analyst (50/5GB/14d/1GB)
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="setQuotaPreset('admin')">
+                                    Admin (1000/10GB/30d/2GB)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.roles') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Roles
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Update Role
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Role Usage Statistics -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Role Usage Statistics</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h4 class="text-primary">{{ role.users|length }}</h4>
+                        <p class="text-muted mb-0">Users Assigned</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h4 class="text-success">{{ role.permissions.get('tools', [])|length if role.permissions else 0 }}</h4>
+                        <p class="text-muted mb-0">Tool Permissions</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h4 class="text-info">{{ role.created_at.strftime('%Y-%m-%d') if role.created_at else 'N/A' }}</h4>
+                        <p class="text-muted mb-0">Created</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users with this Role -->
+        {% if role.users %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-people"></i> Users with this Role</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for user in role.users[:12] %}
+                    <div class="col-md-6 mb-2">
+                        <div class="d-flex align-items-center">
+                            <div class="me-2">
+                                {% if user.active %}
+                                    <i class="bi bi-person-check text-success"></i>
+                                {% else %}
+                                    <i class="bi bi-person-x text-danger"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <strong>{{ user.username }}</strong>
+                                <br>
+                                <small class="text-muted">{{ user.email }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if role.users|length > 12 %}
+                    <div class="col-12">
+                        <small class="text-muted">... and {{ role.users|length - 12 }} more users</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Danger Zone -->
+        <div class="card mt-4 border-danger">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Danger Zone</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-danger">Delete this role</h6>
+                        <p class="text-muted mb-0">Permanently delete this role. This action cannot be undone.</p>
+                    </div>
+                    <div>
+                        {% if role.users|length > 0 %}
+                            <button type="button" class="btn btn-outline-secondary" disabled>
+                                <i class="bi bi-lock"></i> Cannot Delete
+                            </button>
+                            <small class="text-muted d-block">{{ role.users|length }} users assigned</small>
+                        {% else %}
+                            <button type="button" class="btn btn-outline-danger" onclick="showDeleteModal()">
+                                <i class="bi bi-trash"></i> Delete Role
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Role Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Role</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone!
+                </div>
+                <p>Are you sure you want to permanently delete the role <strong>{{ role.name }}</strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('admin.delete_role', role_id=role.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="confirm_delete" value="true"/>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete Role
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showDeleteModal() {
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+}
+
+// Set quota presets
+function setQuotaPreset(preset) {
+    if (preset === 'basic') {
+        document.getElementById('max_daily_downloads').value = 3;
+        document.getElementById('max_storage_mb').value = 256;
+        document.getElementById('max_retention_days').value = 3;
+        document.getElementById('max_file_size_mb').value = 100;
+    } else if (preset === 'standard') {
+        document.getElementById('max_daily_downloads').value = 10;
+        document.getElementById('max_storage_mb').value = 1024;
+        document.getElementById('max_retention_days').value = 7;
+        document.getElementById('max_file_size_mb').value = 500;
+    } else if (preset === 'analyst') {
+        document.getElementById('max_daily_downloads').value = 50;
+        document.getElementById('max_storage_mb').value = 5120;
+        document.getElementById('max_retention_days').value = 14;
+        document.getElementById('max_file_size_mb').value = 1024;
+    } else if (preset === 'admin') {
+        document.getElementById('max_daily_downloads').value = 1000;
+        document.getElementById('max_storage_mb').value = 10240;
+        document.getElementById('max_retention_days').value = 30;
+        document.getElementById('max_file_size_mb').value = 2048;
+    }
+    
+    // Show visual feedback
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-info alert-dismissible fade show position-fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <i class="bi bi-download"></i> Applied ${preset} quota preset
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
+
+// Show warning when changing permissions
+let originalPermissions = {};
+document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    originalPermissions[cb.id] = cb.checked;
+    
+    cb.addEventListener('change', function() {
+        const hasChanges = Object.keys(originalPermissions).some(id => 
+            originalPermissions[id] !== document.getElementById(id).checked
+        );
+        
+        if (hasChanges) {
+            const warning = document.getElementById('changes-warning');
+            if (!warning) {
+                const div = document.createElement('div');
+                div.id = 'changes-warning';
+                div.className = 'alert alert-warning mt-3';
+                div.innerHTML = '<i class="bi bi-exclamation-triangle"></i> <strong>Note:</strong> Changing permissions will affect all users assigned to this role.';
+                document.querySelector('form').appendChild(div);
+            }
+        } else {
+            const warning = document.getElementById('changes-warning');
+            if (warning) {
+                warning.remove();
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

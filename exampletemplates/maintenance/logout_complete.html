@@ -1,0 +1,125 @@
+{% extends "base_new.html" %}
+
+{% block title %}Session Terminated - Maintenance Log{% endblock %}
+
+{% block content %}
+<style>
+.lockout-container {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    border: 3px solid #e74c3c;
+    border-radius: 15px;
+    color: #ecf0f1;
+    padding: 3rem;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    box-shadow: 
+        0 0 30px rgba(231, 76, 60, 0.5),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.lockout-title {
+    color: #e74c3c;
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    margin-bottom: 1rem;
+    animation: pulse 2s infinite;
+}
+
+.lockout-message {
+    color: #f39c12;
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.system-info {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid #34495e;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 2rem 0;
+    font-size: 0.9rem;
+    color: #95a5a6;
+}
+
+.return-btn {
+    background: linear-gradient(45deg, #e67e22, #f39c12) !important;
+    border: none !important;
+    color: #2c3e50 !important;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.4);
+    transition: all 0.3s ease;
+}
+
+.return-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(230, 126, 34, 0.6);
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="lockout-container">
+            <div class="lockout-title">🔒 SYSTEM LOCKED</div>
+            
+            <div class="lockout-message">
+                MAINTENANCE SESSION TERMINATED
+            </div>
+            
+            <div class="mb-4">
+                <i class="bi bi-shield-x" style="font-size: 4rem; color: #e74c3c;"></i>
+            </div>
+            
+            <div class="system-info">
+                📋 SESSION LOG:<br>
+                • Diagnostic tools secured<br>
+                • Work orders saved to database<br>
+                • Safety protocols re-engaged<br>
+                • Access credentials cleared<br>
+                • Maintenance bay locked<br><br>
+                
+                🏭 FACILITY STATUS: SECURED<br>
+                🔧 NEXT MAINTENANCE WINDOW: AS NEEDED<br>
+                ⚡ SYSTEM READY FOR NEXT TECHNICIAN
+            </div>
+            
+            <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 2rem;">
+                Thank you for using the Industrial Diagnostic System.<br>
+                Please ensure all tools are returned to proper storage locations.
+            </p>
+            
+            <a href="{{ url_for('security.login') }}" class="btn return-btn">
+                🔧 RETURN TO MAINTENANCE LOG
+            </a>
+            
+            <div class="mt-4" style="font-size: 0.7rem; color: #7f8c8d;">
+                OSINT-7734 | BUILD: 2025.07.22 | SAFETY PROTOCOL ALPHA-7
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add some industrial sound effects simulation
+document.querySelector('.return-btn').addEventListener('click', function() {
+    // Visual feedback for "system restart"
+    document.body.style.opacity = '0.8';
+    setTimeout(() => {
+        document.body.style.opacity = '1';
+    }, 200);
+});
+</script>
+{% endblock %}

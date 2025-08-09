@@ -1,0 +1,1506 @@
+{% extends "base_new.html" %}
+
+{% block title %}Task Management - Admin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-gear-fill"></i> Task Management</h2>
+            <div>
+                <button id="refreshStats" class="btn btn-outline-primary btn-sm me-2">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <form method="post" action="{{ url_for('admin.cleanup_stuck_tasks') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-warning btn-sm" 
+                            onclick="return confirm('This will clear all Redis queues and reset stuck tasks to failed status. Continue?')">
+                        <i class="bi bi-trash"></i> Clean Stuck Tasks
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Redis Queue Status -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h3 id="osintQueueLength">{{ redis_stats.osint_queue_length }}</h3>
+                                <p class="mb-0">OSINT Queue</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-search fs-1"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h3 id="celeryQueueLength">{{ redis_stats.celery_queue_length }}</h3>
+                                <p class="mb-0">Celery Queue</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-cpu fs-1"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h3 id="downloadQueueLength">{{ redis_stats.download_queue_length }}</h3>
+                                <p class="mb-0">Download Queue</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-download fs-1"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Task Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-search"></i> Search Tasks</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-secondary fs-6" id="searchPending">{{ search_stats.pending }}</span>
+                                </div>
+                                <small class="text-muted">Pending</small>
+                            </div>
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-info fs-6" id="searchRunning">{{ search_stats.running }}</span>
+                                </div>
+                                <small class="text-muted">Running</small>
+                            </div>
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-success fs-6" id="searchCompleted">{{ search_stats.completed }}</span>
+                                </div>
+                                <small class="text-muted">Completed</small>
+                            </div>
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-danger fs-6" id="searchFailed">{{ search_stats.failed }}</span>
+                                </div>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-download"></i> Download Tasks</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="mb-2">
+                                    <span class="badge bg-secondary fs-6" id="downloadPending">{{ download_stats.pending }}</span>
+                                </div>
+                                <small class="text-muted">Pending</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="mb-2">
+                                    <span class="badge bg-success fs-6" id="downloadCompleted">{{ download_stats.completed }}</span>
+                                </div>
+                                <small class="text-muted">Completed</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="mb-2">
+                                    <span class="badge bg-danger fs-6" id="downloadFailed">{{ download_stats.failed }}</span>
+                                </div>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- All Tasks Table -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <h5 class="mb-0 me-3"><i class="bi bi-list-task"></i> Tasks</h5>
+                            
+                            <select class="form-select form-select-sm me-2" id="taskFilter" style="width: auto;">
+                                <option value="all">All Tasks</option>
+                                <option value="recent_searches">Recent Searches</option>
+                                <option value="all_searches">All Searches</option>
+                                <option value="recent_downloads">Recent Downloads</option>
+                                <option value="all_downloads">All Downloads</option>
+                            </select>
+                            
+                            <select class="form-select form-select-sm me-2" id="statusFilter" style="width: auto;">
+                                <option value="all_status">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="running">Running</option>
+                                <option value="analyzing">Analyzing</option>
+                                <option value="queued">Queued</option>
+                                <option value="downloading">Downloading</option>
+                                <option value="completed">Completed</option>
+                                <option value="failed">Failed</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="paused">Paused</option>
+                                <option value="expired">Expired</option>
+                            </select>
+                            
+                            <select class="form-select form-select-sm me-3" id="toolFilter" style="width: auto;">
+                                <option value="all_tools">All Tools</option>
+                                <option value="holehe">Holehe</option>
+                                <option value="sherlock">Sherlock</option>
+                                <option value="ghunt">Ghunt</option>
+                                <option value="instaloader">Instaloader</option>
+                                <option value="telegram">Telegram</option>
+                                <option value="video_downloader">Video Downloader</option>
+                            </select>
+                            
+                            <small class="text-muted">Click column headers to sort</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-warning btn-sm me-2 text-dark" onclick="bulkCancelPending()" data-bs-toggle="tooltip" title="Cancel All Pending Tasks">
+                                <i class="bi bi-stop-circle"></i> Cancel All Pending
+                            </button>
+                            <button class="btn btn-info btn-sm text-white" onclick="bulkRetryFailed()" data-bs-toggle="tooltip" title="Retry All Failed Tasks">
+                                <i class="bi bi-arrow-clockwise"></i> Retry All Failed
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" id="allTasksTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th class="sortable" data-sort="target" style="width: 25%;">
+                                            Search Target <i class="bi bi-arrow-down-up"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="tool" style="width: 15%;">
+                                            Tool <i class="bi bi-arrow-down-up"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="date" style="width: 15%;">
+                                            Date <i class="bi bi-arrow-down-up"></i>
+                                        </th>
+                                        <th class="sortable" data-sort="status" style="width: 10%;">
+                                            Status <i class="bi bi-arrow-down-up"></i>
+                                        </th>
+                                        <th style="width: 8%;">Type</th>
+                                        <th style="width: 27%;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tasksTableBody">
+                                    <!-- Combined search and download tasks -->
+                                    {% for search in recent_searches %}
+                                    <tr data-type="search" data-date="{{ search.created_at.isoformat() }}" data-status="{{ search.status.value }}" data-tool="{{ search.tool_name }}" data-target="{{ search.search_query }}">
+                                        <td>
+                                            <small class="text-muted">{{ search.search_query[:30] }}{% if search.search_query|length > 30 %}...{% endif %}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ search.tool_name }}</span>
+                                        </td>
+                                        <td>{{ search.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ 'secondary' if search.status.value == 'pending' else ('info' if search.status.value == 'running' else ('success' if search.status.value == 'completed' else ('danger' if search.status.value == 'failed' else 'warning'))) }}">
+                                                {{ search.status.value }}
+                                            </span>
+                                        </td>
+                                        <td><span class="badge bg-primary">Search</span></td>
+                                        <td>
+                                            <div class="btn-group-sm" role="group">
+                                                <!-- View Details (always available) -->
+                                                <button class="btn btn-outline-primary btn-sm me-1" onclick="viewTaskDetails({{ search.id }}, 'search')" data-bs-toggle="tooltip" title="View Details">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                
+                                                <!-- Start button -->
+                                                {% if search.status.value == 'pending' %}
+                                                <button class="btn btn-outline-success btn-sm me-1" onclick="startTask({{ search.id }})" data-bs-toggle="tooltip" title="Start Now">
+                                                    <i class="bi bi-play-circle"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-success btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot start (Status: {{ search.status.value }})">
+                                                    <i class="bi bi-play-circle"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Pause button -->
+                                                {% if search.status.value == 'running' %}
+                                                <button class="btn btn-outline-warning btn-sm me-1" onclick="pauseTask({{ search.id }})" data-bs-toggle="tooltip" title="Pause">
+                                                    <i class="bi bi-pause-circle"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-warning btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot pause (Status: {{ search.status.value }})">
+                                                    <i class="bi bi-pause-circle"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Resume button -->
+                                                {% if search.status.value == 'paused' %}
+                                                <button class="btn btn-outline-info btn-sm me-1" onclick="resumeTask({{ search.id }})" data-bs-toggle="tooltip" title="Resume">
+                                                    <i class="bi bi-play-fill"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-info btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot resume (Status: {{ search.status.value }})">
+                                                    <i class="bi bi-play-fill"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Cancel button -->
+                                                {% if search.status.value in ['pending', 'running'] %}
+                                                <button class="btn btn-outline-danger btn-sm me-1" onclick="cancelSearchTask({{ search.id }})" data-bs-toggle="tooltip" title="Cancel">
+                                                    <i class="bi bi-stop-circle"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-danger btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot cancel (Status: {{ search.status.value }})">
+                                                    <i class="bi bi-stop-circle"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Retry button -->
+                                                {% if search.status.value in ['failed', 'cancelled', 'completed'] %}
+                                                <button class="btn btn-outline-secondary btn-sm me-1" onclick="retrySearchTask({{ search.id }})" data-bs-toggle="tooltip" title="{{ 'Run Again' if search.status.value == 'completed' else 'Retry' }}">
+                                                    <i class="bi bi-arrow-clockwise"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot retry (Status: {{ search.status.value }})">
+                                                    <i class="bi bi-arrow-clockwise"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Delete button -->
+                                                {% if search.status.value in ['failed', 'cancelled'] %}
+                                                <button class="btn btn-outline-dark btn-sm me-1" onclick="deleteTask({{ search.id }})" data-bs-toggle="tooltip" title="Delete">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-dark btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot delete (Status: {{ search.status.value }})">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Duplicate button -->
+                                                {% if search.status.value == 'completed' %}
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="duplicateTask({{ search.id }})" data-bs-toggle="tooltip" title="Duplicate">
+                                                    <i class="bi bi-files"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm" disabled data-bs-toggle="tooltip" title="Cannot duplicate (Status: {{ search.status.value }})">
+                                                    <i class="bi bi-files"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    
+                                    {% for download in recent_downloads %}
+                                    <tr data-type="download" data-date="{{ download.created_at.isoformat() }}" data-status="{{ download.status.value }}" data-tool="video_downloader" data-target="{{ download.original_url }}">
+                                        <td>
+                                            <small class="text-muted">{{ download.original_url[:30] }}{% if download.original_url|length > 30 %}...{% endif %}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">Video Downloader</span>
+                                        </td>
+                                        <td>{{ download.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ 'secondary' if download.status.value == 'pending' else ('info' if download.status.value in ['analyzing', 'queued', 'downloading'] else ('success' if download.status.value == 'completed' else ('danger' if download.status.value == 'failed' else 'warning'))) }}">
+                                                {{ download.status.value }}
+                                            </span>
+                                        </td>
+                                        <td><span class="badge bg-info">Download</span></td>
+                                        <td>
+                                            <div class="btn-group-sm" role="group">
+                                                <!-- View Details (always available) -->
+                                                <button class="btn btn-outline-primary btn-sm me-1" onclick="viewDownloadDetails('{{ download.download_id }}')" data-bs-toggle="tooltip" title="View Details">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                
+                                                <!-- Start button -->
+                                                {% if download.status.value == 'pending' %}
+                                                <button class="btn btn-outline-success btn-sm me-1" onclick="startDownloadTask('{{ download.download_id }}')" data-bs-toggle="tooltip" title="Start Now">
+                                                    <i class="bi bi-play-circle"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-success btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot start (Status: {{ download.status.value }})">
+                                                    <i class="bi bi-play-circle"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Pause button -->
+                                                {% if download.status.value in ['analyzing', 'queued', 'downloading'] %}
+                                                <button class="btn btn-outline-warning btn-sm me-1" onclick="pauseDownloadTask('{{ download.download_id }}')" data-bs-toggle="tooltip" title="Pause">
+                                                    <i class="bi bi-pause-circle"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-warning btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot pause (Status: {{ download.status.value }})">
+                                                    <i class="bi bi-pause-circle"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Resume button -->
+                                                {% if download.status.value == 'paused' %}
+                                                <button class="btn btn-outline-info btn-sm me-1" onclick="resumeDownloadTask('{{ download.download_id }}')" data-bs-toggle="tooltip" title="Resume">
+                                                    <i class="bi bi-play-fill"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-info btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot resume (Status: {{ download.status.value }})">
+                                                    <i class="bi bi-play-fill"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Cancel button -->
+                                                {% if download.status.value in ['pending', 'analyzing', 'queued', 'downloading', 'paused'] %}
+                                                <button class="btn btn-outline-danger btn-sm me-1" onclick="cancelDownloadTask('{{ download.download_id }}')" data-bs-toggle="tooltip" title="Cancel">
+                                                    <i class="bi bi-stop-circle"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-danger btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot cancel (Status: {{ download.status.value }})">
+                                                    <i class="bi bi-stop-circle"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Retry button -->
+                                                {% if download.status.value in ['failed', 'cancelled', 'completed', 'expired'] %}
+                                                <button class="btn btn-outline-secondary btn-sm me-1" onclick="retryDownloadTask('{{ download.download_id }}')" data-bs-toggle="tooltip" title="{{ 'Download Again' if download.status.value == 'completed' else 'Retry' }}">
+                                                    <i class="bi bi-arrow-clockwise"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot retry (Status: {{ download.status.value }})">
+                                                    <i class="bi bi-arrow-clockwise"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Delete button -->
+                                                {% if download.status.value in ['failed', 'cancelled', 'expired'] %}
+                                                <button class="btn btn-outline-dark btn-sm me-1" onclick="deleteDownloadTask('{{ download.download_id }}')" data-bs-toggle="tooltip" title="Delete">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-dark btn-sm me-1" disabled data-bs-toggle="tooltip" title="Cannot delete (Status: {{ download.status.value }})">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                                {% endif %}
+                                                
+                                                <!-- Duplicate button -->
+                                                {% if download.status.value == 'completed' %}
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="duplicateDownloadTask('{{ download.download_id }}')" data-bs-toggle="tooltip" title="Duplicate">
+                                                    <i class="bi bi-files"></i>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm" disabled data-bs-toggle="tooltip" title="Cannot duplicate (Status: {{ download.status.value }})">
+                                                    <i class="bi bi-files"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<style>
+/* Modal styling for proper visibility and contrast */
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+.modal-content {
+    background-color: white !important;
+    border: 2px solid #dee2e6;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    background-color: #0d6efd !important;
+    color: white !important;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-body {
+    background-color: white !important;
+    color: #212529 !important;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    background-color: #f8f9fa !important;
+    border-top: 1px solid #dee2e6;
+}
+
+.modal-body table {
+    background-color: white !important;
+}
+
+.modal-body .alert {
+    background-color: #f8d7da !important;
+    border-color: #f5c6cb;
+    color: #721c24 !important;
+}
+
+.modal-body .badge {
+    color: white !important;
+}
+
+/* Ensure text contrast in modals */
+.modal-body .text-muted {
+    color: #6c757d !important;
+}
+
+.modal-body pre {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+    border: 1px solid #dee2e6;
+}
+
+/* Force modal title color */
+.modal-title {
+    color: white !important;
+}
+
+/* Ensure close button is visible */
+.btn-close-white {
+    filter: invert(1) grayscale(100%) brightness(200%) !important;
+    opacity: 1 !important;
+}
+
+.modal-header .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%) !important;
+    opacity: 1 !important;
+    color: white !important;
+}
+
+/* Enable tooltips on disabled buttons */
+.btn:disabled {
+    pointer-events: auto !important;
+}
+
+.btn:disabled:hover {
+    cursor: not-allowed;
+}
+</style>
+
+<script>
+// Global task action functions - must be global for onclick handlers
+function viewTaskDetails(taskId, type) {
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('taskDetailsModal'));
+    modal.show();
+    
+    // Load task details
+    fetch(`/admin/tasks/${taskId}/details`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayTaskDetails(data.task);
+            } else {
+                document.getElementById('taskDetailsBody').innerHTML = 
+                    `<div class="alert alert-danger">Error loading task details: ${data.message}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading task details:', error);
+            document.getElementById('taskDetailsBody').innerHTML = 
+                '<div class="alert alert-danger">Error loading task details</div>';
+        });
+}
+
+function displayTaskDetails(task) {
+    const body = document.getElementById('taskDetailsBody');
+    const actions = document.getElementById('taskDetailsActions');
+    
+    body.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Basic Information</h6>
+                <table class="table table-sm">
+                    <tr><th>ID:</th><td>${task.id}</td></tr>
+                    <tr><th>Type:</th><td>${task.type}</td></tr>
+                    <tr><th>Tool:</th><td>${task.tool_name || 'N/A'}</td></tr>
+                    <tr><th>Query:</th><td>${task.query || task.original_url || 'N/A'}</td></tr>
+                    <tr><th>Status:</th><td><span class="badge bg-${getStatusColor(task.status)}">${task.status}</span></td></tr>
+                    <tr><th>Investigation:</th><td>${task.investigation_name || 'None'}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Timing</h6>
+                <table class="table table-sm">
+                    <tr><th>Created:</th><td>${new Date(task.created_at).toLocaleString()}</td></tr>
+                    <tr><th>Started:</th><td>${task.started_at ? new Date(task.started_at).toLocaleString() : 'Not started'}</td></tr>
+                    <tr><th>Completed:</th><td>${task.completed_at ? new Date(task.completed_at).toLocaleString() : 'Not completed'}</td></tr>
+                    <tr><th>Duration:</th><td>${task.duration || 'N/A'}</td></tr>
+                    <tr><th>Progress:</th><td>${task.progress_percent || 0}%</td></tr>
+                </table>
+            </div>
+        </div>
+        ${task.error_message ? `
+            <div class="mt-3">
+                <h6>Error Details</h6>
+                <div class="alert alert-danger">${task.error_message}</div>
+            </div>
+        ` : ''}
+        ${task.results_count ? `
+            <div class="mt-3">
+                <h6>Results</h6>
+                <p>Found ${task.results_count} results</p>
+            </div>
+        ` : ''}
+        ${task.metadata ? `
+            <div class="mt-3">
+                <h6>Metadata</h6>
+                <pre class="bg-light p-2">${JSON.stringify(task.metadata, null, 2)}</pre>
+            </div>
+        ` : ''}
+    `;
+    
+    // Update action buttons
+    actions.innerHTML = getTaskButtons(task.id, task.status, task.type);
+    
+    // Note: Tooltips will be initialized by page load events
+}
+
+function startTask(taskId) {
+    if (!confirm('Start this task now?')) return;
+    performTaskAction(taskId, 'start', 'Task started');
+}
+
+function pauseTask(taskId) {
+    if (!confirm('Pause this task?')) return;
+    performTaskAction(taskId, 'pause', 'Task paused');
+}
+
+function resumeTask(taskId) {
+    if (!confirm('Resume this task?')) return;
+    performTaskAction(taskId, 'resume', 'Task resumed');
+}
+
+function deleteTask(taskId) {
+    if (!confirm('Permanently delete this task? This cannot be undone.')) return;
+    performTaskAction(taskId, 'delete', 'Task deleted');
+}
+
+function duplicateTask(taskId) {
+    if (!confirm('Create a duplicate of this task?')) return;
+    performTaskAction(taskId, 'duplicate', 'Task duplicated');
+}
+
+function cancelTask(taskId) {
+    if (!confirm('Are you sure you want to cancel this task?')) return;
+    performTaskAction(taskId, 'cancel', 'Task cancelled');
+}
+
+function retryTask(taskId) {
+    if (!confirm('Are you sure you want to retry this task?')) return;
+    performTaskAction(taskId, 'retry', 'Task retried');
+}
+
+function performTaskAction(taskId, action, successMessage) {
+    fetch(`/admin/tasks/${taskId}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message || successMessage);
+            // Reload the page to refresh the table
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.message || data.error));
+        }
+    })
+    .catch(error => {
+        console.error(`Error performing ${action}:`, error);
+        alert(`Error performing ${action}`);
+    });
+}
+
+// Global helper functions
+function getStatusColor(status) {
+    const statusColors = {
+        'PENDING': 'secondary',
+        'RUNNING': 'info',
+        'ANALYZING': 'info',
+        'QUEUED': 'secondary', 
+        'DOWNLOADING': 'info',
+        'PAUSED': 'warning',
+        'COMPLETED': 'success',
+        'FAILED': 'danger',
+        'CANCELLED': 'warning',
+        'EXPIRED': 'dark'
+    };
+    return statusColors[status] || 'secondary';
+}
+
+function initializeTooltips() {
+    // Dispose of existing tooltips first to prevent duplicates
+    const existingTooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    existingTooltips.forEach(element => {
+        const existingTooltip = bootstrap.Tooltip.getInstance(element);
+        if (existingTooltip) {
+            existingTooltip.dispose();
+        }
+    });
+    
+    // Initialize Bootstrap tooltips for all elements with data-bs-toggle="tooltip"
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        // For disabled elements, we need special handling
+        const options = {};
+        if (tooltipTriggerEl.disabled) {
+            // Use custom trigger for disabled elements
+            options.trigger = 'hover focus';
+        }
+        return new bootstrap.Tooltip(tooltipTriggerEl, options);
+    });
+}
+
+// Download task functions
+function viewDownloadDetails(downloadId) {
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('taskDetailsModal'));
+    modal.show();
+    
+    // Load download details
+    fetch(`/api/tasks/download/${downloadId}/details`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayDownloadDetails(data.download);
+            } else {
+                document.getElementById('taskDetailsBody').innerHTML = 
+                    `<div class="alert alert-danger">Error loading download details: ${data.message}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading download details:', error);
+            document.getElementById('taskDetailsBody').innerHTML = 
+                '<div class="alert alert-danger">Error loading download details</div>';
+        });
+}
+
+function displayDownloadDetails(download) {
+    const body = document.getElementById('taskDetailsBody');
+    const actions = document.getElementById('taskDetailsActions');
+    
+    body.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Basic Information</h6>
+                <table class="table table-sm">
+                    <tr><th>ID:</th><td>${download.id}</td></tr>
+                    <tr><th>Download ID:</th><td>${download.download_id}</td></tr>
+                    <tr><th>Title:</th><td>${download.title || 'N/A'}</td></tr>
+                    <tr><th>URL:</th><td class="text-break">${download.original_url}</td></tr>
+                    <tr><th>Status:</th><td><span class="badge bg-${getStatusColor(download.status)}">${download.status}</span></td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Progress & Timing</h6>
+                <table class="table table-sm">
+                    <tr><th>Created:</th><td>${new Date(download.created_at).toLocaleString()}</td></tr>
+                    <tr><th>Progress:</th><td>${download.progress_percent || 0}%</td></tr>
+                    <tr><th>File Size:</th><td>${download.file_size || 'Unknown'}</td></tr>
+                    <tr><th>File Path:</th><td>${download.file_path || 'N/A'}</td></tr>
+                </table>
+            </div>
+        </div>
+        ${download.error_message ? `
+            <div class="mt-3">
+                <h6>Error Details</h6>
+                <div class="alert alert-danger">${download.error_message}</div>
+            </div>
+        ` : ''}
+    `;
+    
+    // Update action buttons for downloads
+    actions.innerHTML = getDownloadTaskButtons(download.id, download.download_id, download.status);
+    
+    // Note: Tooltips will be initialized by page load events
+}
+
+function cancelDownloadTask(downloadId) {
+    if (!confirm('Are you sure you want to cancel this download?')) return;
+    
+    fetch(`/api/video-downloader/cancel/${downloadId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success || data.status === 'success') {
+            alert(data.message || 'Download cancelled successfully');
+            loadTaskLists();
+            refreshTaskStats();
+        } else {
+            alert('Error: ' + (data.message || data.error));
+        }
+    })
+    .catch(error => {
+        console.error('Error cancelling download:', error);
+        alert('Error cancelling download');
+    });
+}
+
+function retryDownloadTask(downloadId) {
+    if (!confirm('Are you sure you want to retry this download?')) return;
+    
+    fetch(`/api/tasks/download/${downloadId}/retry`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success || data.status === 'success') {
+            alert(data.message || 'Download retry queued successfully');
+            loadTaskLists();
+            refreshTaskStats();
+        } else {
+            alert('Error: ' + (data.message || data.error));
+        }
+    })
+    .catch(error => {
+        console.error('Error retrying download:', error);
+        alert('Error retrying download');
+    });
+}
+
+function deleteDownloadTask(downloadId) {
+    if (!confirm('Permanently delete this download task? This cannot be undone.')) return;
+    
+    fetch(`/api/tasks/download/${downloadId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Download task deleted');
+            loadTaskLists();
+            refreshTaskStats();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting download:', error);
+        alert('Error deleting download task');
+    });
+}
+
+// Search task functions
+function cancelSearchTask(searchId) {
+    if (!confirm('Are you sure you want to cancel this search?')) return;
+    
+    fetch(`/api/search/${searchId}/cancel`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success || data.status === 'success') {
+            alert(data.message || 'Search cancelled successfully');
+            loadTaskLists();
+            refreshTaskStats();
+        } else {
+            alert('Error: ' + (data.message || data.error));
+        }
+    })
+    .catch(error => {
+        console.error('Error cancelling search:', error);
+        alert('Error cancelling search');
+    });
+}
+
+function retrySearchTask(searchId) {
+    if (!confirm('Are you sure you want to retry this search?')) return;
+    
+    fetch(`/api/tasks/search/${searchId}/retry`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success || data.status === 'success') {
+            alert(data.message || 'Search retry queued successfully');
+            loadTaskLists();
+            refreshTaskStats();
+        } else {
+            alert('Error: ' + (data.message || data.error));
+        }
+    })
+    .catch(error => {
+        console.error('Error retrying search:', error);
+        alert('Error retrying search');
+    });
+}
+
+// Additional download task functions
+function startDownloadTask(downloadId) {
+    if (!confirm('Start this download now?')) return;
+    performDownloadAction(downloadId, 'start', 'Download started');
+}
+
+function pauseDownloadTask(downloadId) {
+    if (!confirm('Pause this download?')) return;
+    performDownloadAction(downloadId, 'pause', 'Download paused');
+}
+
+function resumeDownloadTask(downloadId) {
+    if (!confirm('Resume this download?')) return;
+    performDownloadAction(downloadId, 'resume', 'Download resumed');
+}
+
+function duplicateDownloadTask(downloadId) {
+    if (!confirm('Create a duplicate of this download?')) return;
+    performDownloadAction(downloadId, 'duplicate', 'Download duplicated');
+}
+
+function deleteDownloadTask(downloadId) {
+    if (!confirm('Permanently delete this download task? This cannot be undone.')) return;
+    performDownloadAction(downloadId, 'delete', 'Download task deleted');
+}
+
+function performDownloadAction(downloadId, action, successMessage) {
+    fetch(`/api/tasks/download/${downloadId}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success || data.status === 'success') {
+            alert(data.message || successMessage);
+            loadTaskLists();
+            refreshTaskStats();
+        } else {
+            alert('Error: ' + (data.message || data.error));
+        }
+    })
+    .catch(error => {
+        console.error(`Error performing ${action} on download:`, error);
+        alert(`Error performing ${action} on download`);
+    });
+}
+
+function getDownloadTaskButtons(dbId, downloadId, status) {
+    let buttons = '';
+    
+    // View Details button (always available)
+    buttons += `<button class="btn btn-sm btn-outline-primary me-1" onclick="viewDownloadDetails('${downloadId}')" data-bs-toggle="tooltip" data-bs-title="View Details">
+        <i class="bi bi-eye"></i>
+    </button>`;
+    
+    // Cancel button
+    const canCancel = ['PENDING', 'ANALYZING', 'QUEUED', 'DOWNLOADING'].includes(status);
+    buttons += `<button class="btn btn-sm btn-outline-danger me-1" ${canCancel ? `onclick="cancelDownloadTask('${downloadId}')"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canCancel ? 'Cancel' : 'Cannot cancel in current status'}">
+        <i class="bi bi-stop-circle"></i>
+    </button>`;
+    
+    // Retry button
+    const canRetry = ['FAILED', 'CANCELLED', 'EXPIRED'].includes(status);
+    buttons += `<button class="btn btn-sm btn-outline-secondary me-1" ${canRetry ? `onclick="retryDownloadTask('${downloadId}')"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canRetry ? 'Retry' : 'Cannot retry in current status'}">
+        <i class="bi bi-arrow-clockwise"></i>
+    </button>`;
+    
+    // Delete button
+    const canDelete = ['FAILED', 'CANCELLED', 'EXPIRED'].includes(status);
+    buttons += `<button class="btn btn-sm btn-outline-dark me-1" ${canDelete ? `onclick="deleteDownloadTask('${downloadId}')"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canDelete ? 'Delete' : 'Cannot delete in current status'}">
+        <i class="bi bi-trash"></i>
+    </button>`;
+    
+    return buttons;
+}
+
+function getTaskButtons(taskId, status, type) {
+    let buttons = '';
+    
+    // View Details button (always available)
+    buttons += `<button class="btn btn-sm btn-outline-primary me-1" onclick="viewTaskDetails(${taskId}, '${type}')" data-bs-toggle="tooltip" data-bs-title="View Details">
+        <i class="bi bi-eye"></i>
+    </button>`;
+    
+    // Start button
+    const canStart = status === 'PENDING';
+    buttons += `<button class="btn btn-sm btn-outline-success me-1" ${canStart ? `onclick="startTask(${taskId})"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canStart ? 'Start Now' : 'Cannot start in current status'}">
+        <i class="bi bi-play-circle"></i>
+    </button>`;
+    
+    // Pause button
+    const canPause = status === 'RUNNING';
+    buttons += `<button class="btn btn-sm btn-outline-warning me-1" ${canPause ? `onclick="pauseTask(${taskId})"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canPause ? 'Pause' : 'Cannot pause in current status'}">
+        <i class="bi bi-pause-circle"></i>
+    </button>`;
+    
+    // Resume button
+    const canResume = status === 'PAUSED';
+    buttons += `<button class="btn btn-sm btn-outline-info me-1" ${canResume ? `onclick="resumeTask(${taskId})"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canResume ? 'Resume' : 'Cannot resume in current status'}">
+        <i class="bi bi-play-fill"></i>
+    </button>`;
+    
+    // Cancel button
+    const canCancel = ['PENDING', 'RUNNING', 'PAUSED'].includes(status);
+    buttons += `<button class="btn btn-sm btn-outline-danger me-1" ${canCancel ? `onclick="cancelTask(${taskId})"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canCancel ? 'Cancel' : 'Cannot cancel in current status'}">
+        <i class="bi bi-stop-circle"></i>
+    </button>`;
+    
+    // Retry button
+    const canRetry = ['FAILED', 'CANCELLED', 'COMPLETED'].includes(status);
+    buttons += `<button class="btn btn-sm btn-outline-secondary me-1" ${canRetry ? `onclick="retryTask(${taskId})"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canRetry ? (status === 'COMPLETED' ? 'Run Again' : 'Retry') : 'Cannot retry in current status'}">
+        <i class="bi bi-arrow-clockwise"></i>
+    </button>`;
+    
+    // Delete button
+    const canDelete = ['FAILED', 'CANCELLED'].includes(status);
+    buttons += `<button class="btn btn-sm btn-outline-dark me-1" ${canDelete ? `onclick="deleteTask(${taskId})"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canDelete ? 'Delete' : 'Cannot delete in current status'}">
+        <i class="bi bi-trash"></i>
+    </button>`;
+    
+    // Duplicate button
+    const canDuplicate = status === 'COMPLETED';
+    buttons += `<button class="btn btn-sm btn-outline-secondary me-1" ${canDuplicate ? `onclick="duplicateTask(${taskId})"` : 'disabled'} data-bs-toggle="tooltip" data-bs-title="${canDuplicate ? 'Duplicate' : 'Cannot duplicate in current status'}">
+        <i class="bi bi-files"></i>
+    </button>`;
+    
+    return buttons;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh stats every 30 seconds
+    setInterval(refreshTaskStats, 30000);
+    setInterval(loadTaskLists, 30000);
+    
+    // Manual refresh button
+    document.getElementById('refreshStats').addEventListener('click', refreshTaskStats);
+    
+    // Load task lists on page load
+    loadTaskLists();
+    
+    function refreshTaskStats() {
+        fetch('{{ url_for("admin.task_stats_api") }}')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+            .then(data => {
+                if (data.success) {
+                    // Update Redis queue stats
+                    document.getElementById('osintQueueLength').textContent = data.redis_stats.osint_queue_length;
+                    document.getElementById('celeryQueueLength').textContent = data.redis_stats.celery_queue_length;
+                    document.getElementById('downloadQueueLength').textContent = data.redis_stats.download_queue_length;
+                    
+                    // Update search stats
+                    document.getElementById('searchPending').textContent = data.search_stats.pending;
+                    document.getElementById('searchRunning').textContent = data.search_stats.running;
+                    document.getElementById('searchCompleted').textContent = data.search_stats.completed;
+                    document.getElementById('searchFailed').textContent = data.search_stats.failed;
+                    
+                    // Update download stats
+                    document.getElementById('downloadPending').textContent = data.download_stats.pending;
+                    document.getElementById('downloadCompleted').textContent = data.download_stats.completed;
+                    document.getElementById('downloadFailed').textContent = data.download_stats.failed;
+                    
+                    // Clear any error indicators
+                    const errorIndicators = document.querySelectorAll('.stats-error');
+                    errorIndicators.forEach(el => el.remove());
+                } else {
+                    console.error('Failed to refresh stats:', data.error);
+                    showStatsError('Stats refresh failed');
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing stats:', error);
+                showStatsError('Unable to refresh stats: ' + error.message);
+            });
+    }
+    
+    function showStatsError(message) {
+        // Show a small error indicator without breaking the UI
+        const statsContainer = document.querySelector('.row');
+        if (statsContainer && !statsContainer.querySelector('.stats-error')) {
+            const errorEl = document.createElement('div');
+            errorEl.className = 'alert alert-warning alert-sm stats-error mt-2';
+            errorEl.innerHTML = `<small><i class="fas fa-exclamation-triangle"></i> ${message}</small>`;
+            statsContainer.appendChild(errorEl);
+            
+            // Remove after 10 seconds
+            setTimeout(() => {
+                if (errorEl.parentNode) {
+                    errorEl.remove();
+                }
+            }, 10000);
+        }
+    }
+    
+    function loadTaskLists() {
+        // Load recent search tasks
+        fetch('/api/user/searches/recent?limit=10')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else if (response.status === 503) {
+                    // Handle database temporarily unavailable
+                    throw new Error('Database temporarily unavailable');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+            .then(data => {
+                const container = document.getElementById('searchTasksList');
+                if (data.error) {
+                    // Handle backend error response
+                    container.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+                } else if (Array.isArray(data)) {
+                    // Handle successful response (array format)
+                    container.innerHTML = data.map(search => `
+                        <div class="task-item border-bottom py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold">${search.tool_name}: ${search.query.substring(0, 30)}...</div>
+                                    <small class="text-muted">ID: ${search.id} | ${search.created_at}</small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-${getStatusColor(search.status)} me-2">${search.status}</span>
+                                    ${getTaskButtons(search.id, search.status, 'search')}
+                                </div>
+                            </div>
+                            ${search.error_message ? `<div class="text-danger small mt-1">Error: ${search.error_message}</div>` : ''}
+                        </div>
+                    `).join('');
+                } else if (data.searches) {
+                    // Handle error response with searches array
+                    container.innerHTML = data.searches.length > 0 ? 
+                        data.searches.map(search => `
+                            <div class="task-item border-bottom py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold">${search.tool_name}: ${search.query.substring(0, 30)}...</div>
+                                        <small class="text-muted">ID: ${search.id} | ${search.created_at}</small>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-${getStatusColor(search.status)} me-2">${search.status}</span>
+                                        ${getTaskButtons(search.id, search.status, 'search')}
+                                    </div>
+                                </div>
+                                ${search.error_message ? `<div class="text-danger small mt-1">Error: ${search.error_message}</div>` : ''}
+                            </div>
+                        `).join('') : '<div class="alert alert-info">No recent searches</div>';
+                }
+                
+                // Initialize tooltips for new buttons - safe call
+                if (typeof initializeTooltips === 'function') {
+                    setTimeout(initializeTooltips, 100);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading search tasks:', error);
+                const container = document.getElementById('searchTasksList');
+                container.innerHTML = `<div class="alert alert-danger">Unable to load search tasks: ${error.message}</div>`;
+            });
+            
+        // Load recent download tasks
+        fetch('{{ url_for("admin.task_stats_api") }}')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('downloadTasksList');
+                if (data.success && data.recent_downloads) {
+                    let html = '';
+                    data.recent_downloads.forEach(download => {
+                        const statusColor = getStatusColor(download.status);
+                        const buttons = getDownloadTaskButtons(download.id, download.download_id, download.status);
+                        html += `
+                            <div class="card mb-2" id="download-${download.id}">
+                                <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <small><strong>ID:</strong> ${download.id} | <strong>Download ID:</strong> ${download.download_id}</small><br>
+                                            <small><strong>Title:</strong> ${download.title || 'N/A'}</small><br>
+                                            <small><strong>URL:</strong> ${download.original_url.substring(0, 50)}...</small><br>
+                                            <small><strong>Created:</strong> ${new Date(download.created_at).toLocaleString()}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-${statusColor} task-status">${download.status}</span><br>
+                                            <div class="task-actions mt-1">
+                                                ${buttons}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div class="text-muted">No recent downloads</div>';
+                }
+                
+                // Initialize tooltips for new buttons - safe call
+                if (typeof initializeTooltips === 'function') {
+                    setTimeout(initializeTooltips, 100);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading download tasks:', error);
+                document.getElementById('downloadTasksList').innerHTML = '<div class="text-danger">Error loading downloads</div>';
+            });
+    }
+    
+    function bulkCancelPending() {
+        if (!confirm('Are you sure you want to cancel ALL pending tasks?')) return;
+        
+        fetch('/admin/tasks/bulk-actions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+            },
+            body: JSON.stringify({
+                action: 'cancel_pending',
+                task_type: 'both'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                loadTaskLists();
+                refreshTaskStats();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error bulk cancelling:', error);
+            alert('Error bulk cancelling tasks');
+        });
+    }
+    
+    function bulkRetryFailed() {
+        if (!confirm('Are you sure you want to retry ALL failed tasks?')) return;
+        
+        fetch('/admin/tasks/bulk-actions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+            },
+            body: JSON.stringify({
+                action: 'retry_failed',
+                task_type: 'both'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                loadTaskLists();
+                refreshTaskStats();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error bulk retrying:', error);
+            alert('Error bulk retrying tasks');
+        });
+    }
+    
+    // Table sorting functionality
+    function initTableSorting() {
+        const table = document.getElementById('allTasksTable');
+        const tbody = document.getElementById('tasksTableBody');
+        const headers = table.querySelectorAll('th.sortable');
+        
+        let currentSort = { column: null, direction: 'asc' };
+        
+        headers.forEach(header => {
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', () => {
+                const sortColumn = header.getAttribute('data-sort');
+                
+                // Toggle direction if same column, otherwise default to ascending
+                if (currentSort.column === sortColumn) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.direction = 'asc';
+                }
+                currentSort.column = sortColumn;
+                
+                // Update visual indicators
+                headers.forEach(h => {
+                    const icon = h.querySelector('i');
+                    if (h === header) {
+                        icon.className = currentSort.direction === 'asc' ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
+                    } else {
+                        icon.className = 'bi bi-arrow-down-up';
+                    }
+                });
+                
+                // Sort the table
+                sortTable(sortColumn, currentSort.direction);
+            });
+        });
+    }
+    
+    function sortTable(column, direction) {
+        const tbody = document.getElementById('tasksTableBody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        rows.sort((a, b) => {
+            let valueA, valueB;
+            
+            switch (column) {
+                case 'target':
+                    valueA = a.getAttribute('data-target').toLowerCase();
+                    valueB = b.getAttribute('data-target').toLowerCase();
+                    break;
+                case 'tool':
+                    valueA = a.getAttribute('data-tool').toLowerCase();
+                    valueB = b.getAttribute('data-tool').toLowerCase();
+                    break;
+                case 'date':
+                    valueA = new Date(a.getAttribute('data-date'));
+                    valueB = new Date(b.getAttribute('data-date'));
+                    break;
+                case 'status':
+                    valueA = a.getAttribute('data-status');
+                    valueB = b.getAttribute('data-status');
+                    break;
+                default:
+                    return 0;
+            }
+            
+            if (column === 'date') {
+                // Date comparison
+                return direction === 'asc' ? valueA - valueB : valueB - valueA;
+            } else {
+                // String comparison
+                if (valueA < valueB) return direction === 'asc' ? -1 : 1;
+                if (valueA > valueB) return direction === 'asc' ? 1 : -1;
+                return 0;
+            }
+        });
+        
+        // Clear and re-append sorted rows
+        tbody.innerHTML = '';
+        rows.forEach(row => tbody.appendChild(row));
+        
+        // Reinitialize tooltips for the reordered elements
+        if (typeof initializeTooltips === 'function') {
+            initializeTooltips();
+        }
+    }
+    
+    // Initialize table sorting when page loads
+    initTableSorting();
+    
+    // Initialize dropdown filtering
+    initDropdownFilter();
+    
+    function initDropdownFilter() {
+        const taskFilter = document.getElementById('taskFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        const toolFilter = document.getElementById('toolFilter');
+        
+        if (taskFilter) {
+            taskFilter.addEventListener('change', applyAllFilters);
+        }
+        if (statusFilter) {
+            statusFilter.addEventListener('change', applyAllFilters);
+        }
+        if (toolFilter) {
+            toolFilter.addEventListener('change', applyAllFilters);
+        }
+    }
+    
+    function applyAllFilters() {
+        const taskFilterValue = document.getElementById('taskFilter').value;
+        const statusFilterValue = document.getElementById('statusFilter').value;
+        const toolFilterValue = document.getElementById('toolFilter').value;
+        
+        filterTasks(taskFilterValue, statusFilterValue, toolFilterValue);
+    }
+    
+    function filterTasks(taskFilterType, statusFilterType, toolFilterType) {
+        const tbody = document.getElementById('tasksTableBody');
+        const rows = tbody.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            const taskType = row.getAttribute('data-type');
+            const taskStatus = row.getAttribute('data-status');
+            const taskTool = row.getAttribute('data-tool');
+            const taskDate = new Date(row.getAttribute('data-date'));
+            const now = new Date();
+            const daysBetween = (now - taskDate) / (1000 * 60 * 60 * 24);
+            const isRecent = daysBetween <= 7; // Consider tasks from last 7 days as "recent"
+            
+            let showByTask = false;
+            let showByStatus = false;
+            let showByTool = false;
+            
+            // Task type filter
+            switch(taskFilterType) {
+                case 'all':
+                    showByTask = true;
+                    break;
+                case 'recent_searches':
+                    showByTask = taskType === 'search' && isRecent;
+                    break;
+                case 'all_searches':
+                    showByTask = taskType === 'search';
+                    break;
+                case 'recent_downloads':
+                    showByTask = taskType === 'download' && isRecent;
+                    break;
+                case 'all_downloads':
+                    showByTask = taskType === 'download';
+                    break;
+                default:
+                    showByTask = true;
+            }
+            
+            // Status filter
+            if (statusFilterType === 'all_status') {
+                showByStatus = true;
+            } else {
+                showByStatus = taskStatus === statusFilterType;
+            }
+            
+            // Tool filter
+            if (toolFilterType === 'all_tools') {
+                showByTool = true;
+            } else {
+                showByTool = taskTool === toolFilterType;
+            }
+            
+            // Show row only if all filters pass
+            const shouldShow = showByTask && showByStatus && showByTool;
+            row.style.display = shouldShow ? '' : 'none';
+        });
+        
+        // Update table message if no tasks are shown
+        updateTableMessage(taskFilterType, statusFilterType, toolFilterType);
+    }
+    
+    function updateTableMessage(taskFilterType, statusFilterType, toolFilterType) {
+        const tbody = document.getElementById('tasksTableBody');
+        const visibleRows = tbody.querySelectorAll('tr:not([style*="display: none"])');
+        
+        // Remove any existing "no tasks" message
+        const existingMessage = tbody.querySelector('.no-tasks-message');
+        if (existingMessage) {
+            existingMessage.remove();
+        }
+        
+        if (visibleRows.length === 0) {
+            let filterDescription = 'current filters';
+            if (taskFilterType !== 'all' || statusFilterType !== 'all_status' || toolFilterType !== 'all_tools') {
+                const activeFilters = [];
+                if (taskFilterType !== 'all') activeFilters.push(getFilterDisplayName(taskFilterType));
+                if (statusFilterType !== 'all_status') activeFilters.push(statusFilterType);
+                if (toolFilterType !== 'all_tools') activeFilters.push(toolFilterType);
+                filterDescription = activeFilters.join(', ');
+            }
+            
+            const messageRow = document.createElement('tr');
+            messageRow.className = 'no-tasks-message';
+            messageRow.innerHTML = `
+                <td colspan="6" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox"></i><br>
+                    No tasks found for: ${filterDescription}
+                </td>
+            `;
+            tbody.appendChild(messageRow);
+        }
+    }
+    
+    function getFilterDisplayName(filterType) {
+        const names = {
+            'all': 'All Tasks',
+            'recent_searches': 'Recent Searches',
+            'all_searches': 'All Searches', 
+            'recent_downloads': 'Recent Downloads',
+            'all_downloads': 'All Downloads'
+        };
+        return names[filterType] || 'Unknown Filter';
+    }
+});
+
+</script>
+
+<!-- Task Details Modal -->
+<div class="modal fade" id="taskDetailsModal" tabindex="-1" aria-labelledby="taskDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-white" style="background-color: white !important;">
+            <div class="modal-header bg-primary text-white" style="background-color: #0d6efd !important; color: white !important;">
+                <h5 class="modal-title" id="taskDetailsModalLabel" style="color: white !important;">Task Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-white text-dark" id="taskDetailsBody" style="background-color: white !important; color: #212529 !important;">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light" style="background-color: #f8f9fa !important;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div id="taskDetailsActions"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

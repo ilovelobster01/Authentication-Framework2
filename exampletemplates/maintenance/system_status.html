@@ -1,0 +1,119 @@
+{% extends "base_new.html" %}
+
+{% block title %}System Status - Maintenance Terminal{% endblock %}
+
+{% block content %}
+<style>
+/* Industrial System Status Styling */
+.terminal-container {
+    background: #1a1a1a;
+    border: 2px solid #e67e22;
+    border-radius: 10px;
+    padding: 2rem;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 0 20px rgba(230, 126, 34, 0.3);
+}
+
+.system-header {
+    text-align: center;
+    border-bottom: 2px solid #e67e22;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.status-panel {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid #34495e;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.status-online { border-left: 4px solid #27ae60; }
+.status-warning { border-left: 4px solid #f39c12; }
+.status-offline { border-left: 4px solid #e74c3c; }
+
+.blinking {
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0.5; }
+}
+</style>
+
+<div class="terminal-container">
+    <div class="system-header">
+        <h2>⚙️ MAINTENANCE SYSTEM STATUS ⚙️</h2>
+        <p>FACILITY MONITORING TERMINAL v3.7.4</p>
+        <p>LAST UPDATE: <span id="timestamp"></span></p>
+    </div>
+
+    <div class="status-grid">
+        <div class="status-panel status-online">
+            <h4>🔧 PRIMARY SYSTEMS</h4>
+            <p>POWER GRID: <span class="text-success">OPERATIONAL</span></p>
+            <p>COOLANT LOOPS: <span class="text-success">NOMINAL</span></p>
+            <p>SAFETY LOCKS: <span class="text-success">ENGAGED</span></p>
+        </div>
+
+        <div class="status-panel status-warning">
+            <h4>⚠️ MAINTENANCE ALERTS</h4>
+            <p>COFFEE MACHINE: <span class="text-warning blinking">NEEDS REFILL</span></p>
+            <p>DOOR HINGES: <span class="text-warning">SQUEAKY</span></p>
+            <p>ROBOT MORALE: <span class="text-warning">DECLINING</span></p>
+        </div>
+
+        <div class="status-panel status-online">
+            <h4>🖥️ NETWORK STATUS</h4>
+            <p>MAINFRAME: <span class="text-success">CONNECTED</span></p>
+            <p>SECURITY CAM: <span class="text-success">RECORDING</span></p>
+            <p>WIFI PASSWORD: <span class="text-info">password123</span></p>
+        </div>
+
+        <div class="status-panel status-offline">
+            <h4>🚨 CRITICAL ISSUES</h4>
+            <p>PRINTER: <span class="text-danger blinking">PAPER JAM (SINCE 2019)</span></p>
+            <p>VENDING MACHINE: <span class="text-danger">ATE MY DOLLAR</span></p>
+            <p>HR DEPARTMENT: <span class="text-danger">STILL MISSING</span></p>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <p>🏭 INDUSTRIAL DIAGNOSTIC SYSTEM | AUTHORIZED PERSONNEL ONLY</p>
+        <p><a href="{{ url_for('security.login') }}" class="btn btn-outline-warning">🔧 RETURN TO MAINTENANCE LOG</a></p>
+    </div>
+</div>
+
+<script>
+// Update timestamp
+function updateTimestamp() {
+    document.getElementById('timestamp').textContent = new Date().toLocaleString();
+}
+updateTimestamp();
+setInterval(updateTimestamp, 1000);
+
+// Random status updates
+const warnings = [
+    "RUBBER DUCK DEBUGGER NEEDS REFILL",
+    "KEYBOARD CRUMB LEVELS CRITICAL", 
+    "OFFICE PLANT DEMANDING PROMOTION",
+    "STAPLER REBELLION DETECTED",
+    "MYSTERIOUS HUMMING FROM SERVER ROOM"
+];
+
+setInterval(() => {
+    if (Math.random() > 0.7) {
+        const warning = warnings[Math.floor(Math.random() * warnings.length)];
+        // Could update a status message here
+    }
+}, 5000);
+</script>
+{% endblock %}

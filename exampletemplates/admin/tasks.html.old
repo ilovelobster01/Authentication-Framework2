@@ -1,0 +1,255 @@
+{% extends "base_new.html" %}
+
+{% block title %}Task Management - Admin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-gear-fill"></i> Task Management</h2>
+            <div>
+                <button id="refreshStats" class="btn btn-outline-primary btn-sm me-2">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <form method="post" action="{{ url_for('admin.cleanup_stuck_tasks') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-warning btn-sm" 
+                            onclick="return confirm('This will clear all Redis queues and reset stuck tasks to failed status. Continue?')">
+                        <i class="bi bi-trash"></i> Clean Stuck Tasks
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Redis Queue Status -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h3 id="osintQueueLength">{{ redis_stats.osint_queue_length }}</h3>
+                                <p class="mb-0">OSINT Queue</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-search fs-1"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h3 id="celeryQueueLength">{{ redis_stats.celery_queue_length }}</h3>
+                                <p class="mb-0">Celery Queue</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-cpu fs-1"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h3 id="downloadQueueLength">{{ redis_stats.download_queue_length }}</h3>
+                                <p class="mb-0">Download Queue</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-download fs-1"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Task Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-search"></i> Search Tasks</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-secondary fs-6" id="searchPending">{{ search_stats.pending }}</span>
+                                </div>
+                                <small class="text-muted">Pending</small>
+                            </div>
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-info fs-6" id="searchRunning">{{ search_stats.running }}</span>
+                                </div>
+                                <small class="text-muted">Running</small>
+                            </div>
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-success fs-6" id="searchCompleted">{{ search_stats.completed }}</span>
+                                </div>
+                                <small class="text-muted">Completed</small>
+                            </div>
+                            <div class="col-3">
+                                <div class="mb-2">
+                                    <span class="badge bg-danger fs-6" id="searchFailed">{{ search_stats.failed }}</span>
+                                </div>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-download"></i> Download Tasks</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="mb-2">
+                                    <span class="badge bg-secondary fs-6" id="downloadPending">{{ download_stats.pending }}</span>
+                                </div>
+                                <small class="text-muted">Pending</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="mb-2">
+                                    <span class="badge bg-success fs-6" id="downloadCompleted">{{ download_stats.completed }}</span>
+                                </div>
+                                <small class="text-muted">Completed</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="mb-2">
+                                    <span class="badge bg-danger fs-6" id="downloadFailed">{{ download_stats.failed }}</span>
+                                </div>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stuck Tasks -->
+        {% if stuck_searches or stuck_downloads %}
+        <div class="row">
+            {% if stuck_searches %}
+            <div class="col-md-6">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Stuck Search Tasks</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Tool</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for search in stuck_searches %}
+                                    <tr>
+                                        <td>{{ search.id }}</td>
+                                        <td>{{ search.tool_name }}</td>
+                                        <td><span class="badge bg-warning">{{ search.status.value }}</span></td>
+                                        <td>{{ search.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if stuck_downloads %}
+            <div class="col-md-6">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Stuck Download Tasks</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for download in stuck_downloads %}
+                                    <tr>
+                                        <td>{{ download.id }}</td>
+                                        <td><span class="badge bg-warning">{{ download.status.value }}</span></td>
+                                        <td>{{ download.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle"></i> No stuck tasks detected. All queues are healthy.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh stats every 30 seconds
+    setInterval(refreshTaskStats, 30000);
+    
+    // Manual refresh button
+    document.getElementById('refreshStats').addEventListener('click', refreshTaskStats);
+    
+    function refreshTaskStats() {
+        fetch('{{ url_for("admin.task_stats_api") }}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update Redis queue stats
+                    document.getElementById('osintQueueLength').textContent = data.redis_stats.osint_queue_length;
+                    document.getElementById('celeryQueueLength').textContent = data.redis_stats.celery_queue_length;
+                    document.getElementById('downloadQueueLength').textContent = data.redis_stats.download_queue_length;
+                    
+                    // Update search stats
+                    document.getElementById('searchPending').textContent = data.search_stats.pending;
+                    document.getElementById('searchRunning').textContent = data.search_stats.running;
+                    document.getElementById('searchCompleted').textContent = data.search_stats.completed;
+                    document.getElementById('searchFailed').textContent = data.search_stats.failed;
+                    
+                    // Update download stats
+                    document.getElementById('downloadPending').textContent = data.download_stats.pending;
+                    document.getElementById('downloadCompleted').textContent = data.download_stats.completed;
+                    document.getElementById('downloadFailed').textContent = data.download_stats.failed;
+                } else {
+                    console.error('Failed to refresh stats:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing stats:', error);
+            });
+    }
+});
+</script>
+{% endblock %}

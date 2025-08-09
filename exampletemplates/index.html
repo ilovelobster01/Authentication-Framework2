@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}OSINT Web Tools - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="text-center mb-5">OSINT Web Tools</h1>
+        <p class="text-center text-muted mb-5">Select a tool to get started with your OSINT investigation</p>
+    </div>
+</div>
+
+<div class="row">
+    {% for tool in tools %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 tool-card">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="tool-icon">{{ tool.icon }}</div>
+                    <div class="status-indicator">
+                        {% if tool.status == 'active' %}
+                            <span class="badge bg-success">🟢 Active</span>
+                        {% elif tool.status == 'inactive' %}
+                            <span class="badge bg-danger">🔴 Inactive</span>
+                        {% else %}
+                            <span class="badge bg-warning">⚠️ Unknown</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <h5 class="card-title">{{ tool.name }}</h5>
+                <p class="card-text">{{ tool.description }}</p>
+                
+                {% if tool.connector_info %}
+                <div class="connector-info mb-3">
+                    <small class="text-muted">
+                        <strong>MCP Connector:</strong> {{ tool.connector_info.name }} v{{ tool.connector_info.version }}
+                    </small>
+                </div>
+                {% endif %}
+                
+                <a href="{{ url_for(tool.endpoint) }}" class="btn btn-primary">Launch Tool</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <h6>About This Framework</h6>
+            <p class="mb-0">This is a Flask-based framework for creating web interfaces to MCP (Model Context Protocol) connectors. Each tool provides a user-friendly web interface for various OSINT capabilities.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

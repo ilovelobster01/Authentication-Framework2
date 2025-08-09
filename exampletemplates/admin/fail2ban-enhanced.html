@@ -1,0 +1,708 @@
+{% extends "base_new.html" %}
+
+{% block title %}Enhanced Fail2Ban Management - Admin{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Navigation -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('admin.index') }}">
+                <i class="bi bi-house-door"></i> Admin Dashboard
+            </a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">
+            <i class="bi bi-shield-exclamation"></i> Enhanced Fail2Ban Security
+        </li>
+    </ol>
+</nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="bi bi-shield-exclamation text-danger"></i> Enhanced Fail2Ban Security Management</h2>
+                    <p class="text-muted mb-0">Multi-layer protection with 8 specialized jails including GeoIP blocking. Extended ban times: 2 days to 100 days.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('admin.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Admin
+                    </a>
+                    <button id="refresh-btn" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Overview Card -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5><i class="bi bi-info-circle"></i> Fail2Ban Status</h5>
+                        </div>
+                        <div class="card-body">
+                            <pre id="fail2ban-status" class="bg-light p-3" style="max-height: 200px; overflow-y: auto;">Loading...</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5><i class="bi bi-shield-check"></i> Protection Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="protection-summary">
+                                <div class="text-center">
+                                    <div class="spinner-border text-muted" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced Jails Information -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="bi bi-layers"></i> Enhanced Security Jails (8 Active)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="jails-info">
+                        <div class="text-center p-4">
+                            <div class="spinner-border text-muted" role="status">
+                                <span class="visually-hidden">Loading jail information...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Jail Testing -->
+            <div class="card mt-4">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="bi bi-check-circle"></i> Jail Testing</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Run comprehensive tests on all 8 jails to verify they're working correctly.</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <button id="test-jails-btn" class="btn btn-success w-100">
+                                <i class="bi bi-play-circle"></i> Run Jail Tests
+                            </button>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> Tests jail status and configuration
+                            </small>
+                        </div>
+                    </div>
+                    <div id="test-output" class="mt-3" style="display: none;">
+                        <h6>Test Results:</h6>
+                        <pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto; font-size: 0.8em;"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Unban -->
+            <div class="card mt-4">
+                <div class="card-header bg-warning">
+                    <h5><i class="bi bi-exclamation-triangle"></i> Emergency Unban</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manually unban an IP address from all jails:</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <input type="text" id="manual-unban-ip" class="form-control" 
+                                   placeholder="Enter IP address (e.g., 192.168.1.100)" 
+                                   pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+                        </div>
+                        <div class="col-md-4">
+                            <button id="manual-unban-btn" class="btn btn-outline-warning w-100">
+                                <i class="bi bi-unlock"></i> Emergency Unban
+                            </button>
+                        </div>
+                    </div>
+                    <small class="text-info mt-2 d-block">
+                        <i class="bi bi-shield-check"></i> 
+                        192.168.x.x and 127.x.x.x addresses are automatically whitelisted.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Enhanced Banned IPs Table -->
+            <div class="card mt-4">
+                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-shield-exclamation"></i> Security Violations & Banned IPs</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="banned-count" class="badge bg-light text-dark">0</span>
+                        <button id="refresh-banned-btn" class="btn btn-sm btn-outline-light">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="banned-ips-table-container">
+                        <div class="text-center p-4">
+                            <div class="spinner-border text-muted" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Loading security violations...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let bannedIpsData = {};
+    let jailsData = {};
+
+    // Jail descriptions for better user understanding
+    const jailDescriptions = {
+        'osint-web-auth': {
+            'name': 'Authentication Protection',
+            'description': 'Blocks IPs after failed login attempts',
+            'icon': 'bi-person-lock',
+            'color': 'danger',
+            'threshold': '3 attempts / 5 minutes',
+            'bantime': '1 hour'
+        },
+        'osint-web-nginx': {
+            'name': 'HTTP-Level Protection', 
+            'description': 'Blocks HTTP authentication bypasses',
+            'icon': 'bi-globe',
+            'color': 'warning',
+            'threshold': '5 attempts / 5 minutes',
+            'bantime': '2.1 days'
+        },
+        'osint-web-bruteforce': {
+            'name': 'Brute Force Detection',
+            'description': 'Detects rapid successive requests',
+            'icon': 'bi-lightning-charge',
+            'color': 'info',
+            'threshold': '10 requests / 1 minute',
+            'bantime': '8.3 days'
+        },
+        'osint-web-cert': {
+            'name': 'Certificate Protection',
+            'description': 'Blocks certificate authentication failures',
+            'icon': 'bi-shield-lock',
+            'color': 'primary',
+            'threshold': '2 attempts / 5 minutes',
+            'bantime': '8.3 days'
+        },
+        'osint-web-admin': {
+            'name': 'Admin Panel Protection',
+            'description': 'Ultra-strict admin area protection',
+            'icon': 'bi-gear-wide-connected',
+            'color': 'dark',
+            'threshold': '2 attempts / 10 minutes',
+            'bantime': '16.7 days'
+        },
+        'osint-web-scan': {
+            'name': 'Scanning Detection',
+            'description': 'Detects reconnaissance and scanning',
+            'icon': 'bi-search',
+            'color': 'success',
+            'threshold': '5 detections / 5 minutes',
+            'bantime': '100 days'
+        },
+        'osint-web-geoip': {
+            'name': 'GeoIP Protection',
+            'description': 'Blocks all non-Canadian IP addresses',
+            'icon': 'bi-globe-americas',
+            'color': 'warning',
+            'threshold': '1 attempt / instant',
+            'bantime': '100 days'
+        },
+        'sshd': {
+            'name': 'SSH Protection',
+            'description': 'Standard SSH brute force protection',
+            'icon': 'bi-terminal',
+            'color': 'secondary',
+            'threshold': '5 attempts / 10 minutes',
+            'bantime': '10 minutes'
+        }
+    };
+
+    function loadStatus() {
+        fetch('/admin/api/fail2ban/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('fail2ban-status').textContent = data.data;
+                } else {
+                    document.getElementById('fail2ban-status').textContent = 'Error loading status: ' + data.message;
+                }
+            })
+            .catch(error => {
+                document.getElementById('fail2ban-status').textContent = 'Error: ' + error.message;
+            });
+    }
+
+    function loadJailsInfo() {
+        fetch('/admin/api/fail2ban/jails')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    jailsData = data.jails;
+                    displayJailsInfo(jailsData);
+                    updateProtectionSummary(jailsData);
+                }
+            })
+            .catch(error => {
+                document.getElementById('jails-info').innerHTML = 
+                    '<div class="alert alert-danger">Error loading jail information: ' + error.message + '</div>';
+            });
+    }
+
+    function displayJailsInfo(jails) {
+        const container = document.getElementById('jails-info');
+        let html = '';
+        
+        for (const [jailName, info] of Object.entries(jails)) {
+            const desc = jailDescriptions[jailName] || {
+                name: jailName,
+                description: 'Standard protection',
+                icon: 'bi-shield',
+                color: 'secondary',
+                threshold: 'Default',
+                bantime: 'Default'
+            };
+            
+            const statusBadge = info.error ? 
+                '<span class="badge bg-danger">Error</span>' : 
+                '<span class="badge bg-success">Active</span>';
+                
+            html += `
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card border-${desc.color}">
+                        <div class="card-header bg-${desc.color} text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span><i class="${desc.icon}"></i> ${desc.name}</span>
+                                ${statusBadge}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-2">${desc.description}</p>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <strong class="text-${desc.color}">${info.currently_banned || 0}</strong>
+                                    <br><small class="text-muted">Banned</small>
+                                </div>
+                                <div class="col-6">
+                                    <strong class="text-warning">${info.total_failed || 0}</strong>
+                                    <br><small class="text-muted">Total Fails</small>
+                                </div>
+                            </div>
+                            <hr>
+                            <small class="text-muted">
+                                <i class="bi bi-clock"></i> ${desc.threshold}<br>
+                                <i class="bi bi-ban"></i> Ban: ${desc.bantime}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+
+    function updateProtectionSummary(jails) {
+        let totalBanned = 0;
+        let totalFailed = 0;
+        let activeJails = 0;
+        
+        for (const info of Object.values(jails)) {
+            if (!info.error) {
+                activeJails++;
+                totalBanned += info.currently_banned || 0;
+                totalFailed += info.total_failed || 0;
+            }
+        }
+        
+        const html = `
+            <div class="row text-center">
+                <div class="col-4">
+                    <h3 class="text-success">${activeJails}</h3>
+                    <small class="text-muted">Active Jails</small>
+                </div>
+                <div class="col-4">
+                    <h3 class="text-danger">${totalBanned}</h3>
+                    <small class="text-muted">IPs Banned</small>
+                </div>
+                <div class="col-4">
+                    <h3 class="text-warning">${totalFailed}</h3>
+                    <small class="text-muted">Total Failures</small>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('protection-summary').innerHTML = html;
+    }
+
+    function loadBannedIPs() {
+        fetch('/admin/api/fail2ban/banned')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    bannedIpsData = data.banned_ips;
+                    displayBannedIPs(bannedIpsData);
+                    document.getElementById('banned-count').textContent = data.total_banned;
+                } else {
+                    document.getElementById('banned-ips-container').innerHTML = 
+                        '<div class="alert alert-danger">Error loading banned IPs: ' + data.message + '</div>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('banned-ips-container').innerHTML = 
+                    '<div class="alert alert-danger">Error: ' + error.message + '</div>';
+            });
+    }
+
+    // Function to get geolocation info for IP
+    async function getGeolocation(ip) {
+        try {
+            // Skip local/private IPs
+            if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('127.') || ip.startsWith('172.')) {
+                return { country: 'Local Network', city: 'Private IP', flag: '🏠' };
+            }
+            
+            const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city,lat,lon`);
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                const flag = data.countryCode ? getFlagEmoji(data.countryCode) : '🌍';
+                return {
+                    country: data.country || 'Unknown',
+                    city: data.city || 'Unknown',
+                    flag: flag,
+                    lat: data.lat,
+                    lon: data.lon
+                };
+            }
+        } catch (error) {
+            console.log('Geolocation lookup failed:', error);
+        }
+        return { country: 'Unknown', city: 'Unknown', flag: '🌍' };
+    }
+
+    // Function to get flag emoji from country code
+    function getFlagEmoji(countryCode) {
+        const codePoints = countryCode
+            .toUpperCase()
+            .split('')
+            .map(char => 127397 + char.charCodeAt());
+        return String.fromCodePoint(...codePoints);
+    }
+
+    function displayBannedIPs(bannedIps) {
+        const container = document.getElementById('banned-ips-table-container');
+        
+        if (Object.keys(bannedIps).length === 0) {
+            container.innerHTML = '<div class="alert alert-success m-3"><i class="bi bi-check-circle"></i> No security violations detected! System is clean.</div>';
+            return;
+        }
+
+        // Create table structure
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th><i class="bi bi-geo-alt"></i> IP Address</th>
+                            <th><i class="bi bi-shield-exclamation"></i> Violation Type</th>
+                            <th><i class="bi bi-calendar"></i> Banned Time</th>
+                            <th><i class="bi bi-globe"></i> Location</th>
+                            <th><i class="bi bi-gear"></i> Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="banned-ips-tbody">
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                <div class="spinner-border text-muted" role="status">
+                                    <span class="visually-hidden">Loading geolocation data...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        // Populate table with geolocation data
+        populateBannedIpsTable(bannedIps);
+    }
+
+    async function populateBannedIpsTable(bannedIps) {
+        const tbody = document.getElementById('banned-ips-tbody');
+        let tableRows = '';
+        
+        // Collect all IPs first
+        const allIPs = [];
+        for (const [jail, ips] of Object.entries(bannedIps)) {
+            const desc = jailDescriptions[jail] || { name: jail, color: 'secondary', icon: 'bi-shield' };
+            
+            ips.forEach(ipData => {
+                const ip = typeof ipData === 'string' ? ipData : ipData.ip;
+                const isWhitelisted = typeof ipData === 'object' && ipData.whitelisted;
+                
+                allIPs.push({
+                    ip: ip,
+                    jail: jail,
+                    jailName: desc.name,
+                    jailIcon: desc.icon,
+                    jailColor: desc.color,
+                    isWhitelisted: isWhitelisted,
+                    banTime: new Date().toLocaleString() // Placeholder - would need actual ban time from Fail2Ban
+                });
+            });
+        }
+        
+        // Process each IP with geolocation
+        for (const ipInfo of allIPs) {
+            const geoData = await getGeolocation(ipInfo.ip);
+            
+            const statusBadge = ipInfo.isWhitelisted ? 
+                '<span class=\"badge bg-warning\"><i class=\"bi bi-exclamation-triangle\"></i> Whitelisted</span>' :
+                '<span class=\"badge bg-danger\"><i class=\"bi bi-slash-circle\"></i> Banned</span>';
+            
+            const locationInfo = `
+                <div class=\"d-flex align-items-center\">
+                    <span class=\"me-2\" style=\"font-size: 1.2em;\">${geoData.flag}</span>
+                    <div>
+                        <div class=\"fw-bold\">${geoData.country}</div>
+                        <small class=\"text-muted\">${geoData.city}</small>
+                    </div>
+                </div>
+            `;
+            
+            tableRows += `
+                <tr class=\"${ipInfo.isWhitelisted ? 'table-warning' : 'table-light'}\" style=\"background-color: ${ipInfo.isWhitelisted ? '#fff3cd' : '#f8f9fa'} !important;\">
+                    <td>
+                        <div class=\"d-flex align-items-center\">
+                            <span class=\"badge bg-dark me-2\">${ipInfo.ip}</span>
+                            ${statusBadge}
+                        </div>
+                    </td>
+                    <td>
+                        <div class=\"d-flex align-items-center\">
+                            <i class=\"${ipInfo.jailIcon} text-${ipInfo.jailColor} me-2\"></i>
+                            <div>
+                                <div class=\"fw-bold\">${ipInfo.jailName}</div>
+                                <small class=\"text-muted\">${ipInfo.jail}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <div>${ipInfo.banTime}</div>
+                            <small class=\"text-muted\">Recent activity</small>
+                        </div>
+                    </td>
+                    <td>${locationInfo}</td>
+                    <td>
+                        <button class=\"btn btn-sm btn-outline-success unban-btn\" 
+                                data-ip=\"${ipInfo.ip}\" 
+                                data-jail=\"${ipInfo.jail}\"
+                                title=\"Unban ${ipInfo.ip}\">
+                            <i class=\"bi bi-unlock\"></i> Unban
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        tbody.innerHTML = tableRows;
+        
+        // Add unban event listeners
+        document.querySelectorAll('.unban-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const ip = this.dataset.ip;
+                unbanIP(ip, this);
+            });
+        });
+    }
+
+    function unbanIP(ip, button) {
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>';
+        button.disabled = true;
+
+        fetch('/admin/api/fail2ban/unban', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            },
+            body: JSON.stringify({ip: ip})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success' || data.status === 'warning') {
+                showAlert(data.message, data.status === 'success' ? 'success' : 'warning');
+                setTimeout(() => {
+                    loadBannedIPs();
+                    loadJailsInfo();
+                }, 1500);
+            } else {
+                showAlert('Error unbanning IP: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        });
+    }
+
+    function showAlert(message, type) {
+        // Remove existing alerts
+        document.querySelectorAll('.dynamic-alert').forEach(alert => alert.remove());
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+        alertDiv.style.position = 'fixed';
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.style.maxWidth = '400px';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            if (alertDiv.parentElement) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Event listeners
+    document.getElementById('refresh-btn').addEventListener('click', function() {
+        const icon = this.querySelector('i');
+        icon.style.animation = 'spin 1s linear infinite';
+        
+        loadStatus();
+        loadBannedIPs();
+        loadJailsInfo();
+        
+        setTimeout(() => {
+            icon.style.animation = '';
+        }, 1000);
+    });
+
+    // Refresh banned IPs table button
+    document.getElementById('refresh-banned-btn').addEventListener('click', function() {
+        const icon = this.querySelector('i');
+        icon.style.animation = 'spin 1s linear infinite';
+        
+        loadBannedIPs();
+        
+        setTimeout(() => {
+            icon.style.animation = '';
+        }, 1000);
+    });
+
+    document.getElementById('manual-unban-btn').addEventListener('click', function() {
+        const ip = document.getElementById('manual-unban-ip').value.trim();
+        if (!ip) {
+            showAlert('Please enter an IP address', 'warning');
+            return;
+        }
+        
+        const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+        if (!ipRegex.test(ip)) {
+            showAlert('Please enter a valid IP address', 'warning');
+            return;
+        }
+        
+        unbanIP(ip, this);
+        document.getElementById('manual-unban-ip').value = '';
+    });
+
+    document.getElementById('manual-unban-ip').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('manual-unban-btn').click();
+        }
+    });
+
+    // Testing functionality
+    document.getElementById('test-jails-btn').addEventListener('click', function() {
+        const button = this;
+        const output = document.getElementById('test-output');
+        const outputPre = output.querySelector('pre');
+        
+        button.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Running Tests...';
+        button.disabled = true;
+        
+        fetch('/admin/api/fail2ban/test-jails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                outputPre.textContent = data.output;
+                output.style.display = 'block';
+                showAlert('Jail testing completed successfully!', 'success');
+                // Refresh data after testing
+                setTimeout(() => {
+                    loadBannedIPs();
+                    loadJailsInfo();
+                }, 2000);
+            } else {
+                outputPre.textContent = `Error: ${data.message}${data.errors ? '\n\nErrors:\n' + data.errors : ''}`;
+                output.style.display = 'block';
+                showAlert('Jail testing failed: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            outputPre.textContent = 'Network error: ' + error.message;
+            output.style.display = 'block';
+            showAlert('Network error during testing: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            button.innerHTML = '<i class="bi bi-play-circle"></i> Run Jail Tests';
+            button.disabled = false;
+        });
+    });
+
+
+    // Initial load
+    loadStatus();
+    loadBannedIPs();
+    loadJailsInfo();
+    
+    // Auto-refresh every 60 seconds
+    setInterval(() => {
+        loadBannedIPs();
+        loadJailsInfo();
+    }, 60000);
+});
+</script>
+
+<style>
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

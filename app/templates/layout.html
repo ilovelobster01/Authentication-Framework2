@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Admin{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <a href="/admin/">Users</a>
+      |
+      <a href="/admin/certs">Certificates</a>
+      |
+      <a href="/logout">Logout</a>
+    </nav>
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

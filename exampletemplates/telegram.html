@@ -1,0 +1,346 @@
+{% extends "base_new.html" %}
+
+{% block title %}Telegram - Channel Analysis{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-2">💬 Telegram Channel Analysis</h1>
+                <p class="text-muted mb-0">Scrape public Telegram channels and extract metadata, messages, and media information</p>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-success fs-6">🟢 Active</span>
+                <br>
+                <small class="text-muted">telegram v1.0.0</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Channel Analysis</h5>
+            </div>
+            <div class="card-body">
+                <form id="telegramForm">
+                    <!-- Investigation Selection -->
+                    <div class="mb-3">
+                        <label for="investigationSelect" class="form-label">Link to Investigation <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <select class="form-select" id="investigationSelect" name="investigation_id" required>
+                                <option value="">Select an investigation</option>
+                                {% for investigation in investigations %}
+                                <option value="{{ investigation.id }}">
+                                    {{ investigation.name }}
+                                    {% if investigation.case_number %} - {{ investigation.case_number }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <a href="{{ url_for('investigations.create') }}" class="btn btn-outline-secondary" title="Create New Investigation">
+                                <i class="bi bi-plus-circle"></i>
+                            </a>
+                        </div>
+                        <div class="form-text">An investigation is required to organize your search results</div>
+                    </div>
+                    
+                    <!-- Channel URL input -->
+                    <div class="mb-3">
+                        <label for="channelInput" class="form-label">Telegram Channel URL or Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text">💬</span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="channelInput" 
+                                   placeholder="t.me/channel_name or @channel_name"
+                                   title="Telegram channel URL or username"
+                                   required>
+                        </div>
+                        <small class="form-text text-muted">Public channels only. Enter full URL (t.me/channel) or username (@channel)</small>
+                    </div>
+
+                    <!-- Analysis options -->
+                    <div class="card border-info mb-3">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <h6 class="mb-0">⚙️ Analysis Options</h6>
+                            <small class="text-muted">Configure scraping parameters</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="maxMessages" class="form-label">Maximum Messages to Analyze</label>
+                                <input type="number" class="form-control" id="maxMessages" value="50" min="10" max="200">
+                                <small class="form-text text-muted">Number of recent messages to scrape (10-200)</small>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <small>
+                                    <strong>🔍 Analysis Includes:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li>Channel metadata (name, description, member count)</li>
+                                        <li>Message content and timestamps</li>
+                                        <li>Media analysis (photos, videos, documents)</li>
+                                        <li>Engagement metrics (views, forwards)</li>
+                                        <li>Content patterns (hashtags, mentions, links)</li>
+                                    </ul>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Options -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="forceRedoCheck">
+                                <label class="form-check-label" for="forceRedoCheck">
+                                    <small>Force redo (ignore duplicate detection)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                        <button class="btn btn-primary flex-fill" type="submit" id="analyzeButton">
+                            <span id="buttonText">🔍 Analyze Channel</span>
+                            <span id="loadingSpinner" class="spinner-border spinner-border-sm loading-spinner" role="status"></span>
+                        </button>
+                        <button class="btn btn-outline-secondary" type="button" id="newSearchButton">
+                            <i class="bi bi-plus-circle"></i> New Search
+                        </button>
+                    </div>
+                </form>
+                
+                <div id="alertContainer" class="mt-3"></div>
+                
+                <!-- Progress indicator -->
+                <div id="progressContainer" class="mt-3" style="display: none;">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="mb-3">🔍 Analysis in Progress</h6>
+                            <div class="progress mb-2">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                            </div>
+                            <small class="text-muted" id="progressText">Initializing telegram analysis...</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Limitations Notice -->
+                <div class="alert alert-warning mt-3">
+                    <h6 class="mb-2">⚠️ Important Limitations</h6>
+                    <small>
+                        <strong>Public Channels Only:</strong> This tool can only access public Telegram channels.<br>
+                        <strong>Web Scraping Based:</strong> Uses web interface scraping, may be affected by site changes.<br>
+                        <strong>Recent Messages:</strong> Limited to messages visible on the web interface.<br>
+                        <strong>Rate Limiting:</strong> Telegram may rate limit requests. Wait between analyses.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allResults = {};
+let currentChannel = '';
+let pollInterval = null;
+
+document.getElementById('telegramForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const channelUrl = document.getElementById('channelInput').value.trim();
+    const maxMessages = parseInt(document.getElementById('maxMessages').value);
+    const investigationId = document.getElementById('investigationSelect').value;
+    
+    if (!investigationId) {
+        const alertContainer = document.getElementById('alertContainer');
+        alertContainer.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <strong>Error:</strong> Please select an investigation to continue.
+            </div>
+        `;
+        return;
+    }
+    
+    currentChannel = channelUrl;
+    const analyzeButton = document.getElementById('analyzeButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const alertContainer = document.getElementById('alertContainer');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressText = document.getElementById('progressText');
+    
+    // Show loading state
+    analyzeButton.disabled = true;
+    buttonText.textContent = 'Queuing Analysis...';
+    loadingSpinner.style.display = 'inline-block';
+    alertContainer.innerHTML = '';
+    progressContainer.style.display = 'none';
+    
+    try {
+        const requestBody = {
+            tool_name: 'telegram',
+            query: channelUrl,
+            investigation_id: investigationId,
+            search_params: {
+                max_messages: maxMessages
+            },
+            force_redo: document.getElementById('forceRedoCheck').checked
+        };
+        
+        console.log('Sending telegram search request:', requestBody);
+        
+        const response = await fetch('/api/search/queue', getTorFetchOptions({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            },
+            body: JSON.stringify(requestBody)
+        }));
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+        
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Unknown error occurred');
+        }
+        
+        // Show progress indicator and start polling
+        progressContainer.style.display = 'block';
+        progressText.textContent = 'Analysis queued successfully. Starting telegram channel scraping...';
+        buttonText.textContent = 'Analysis in Progress...';
+        startPolling(data.search_id);
+        
+    } catch (error) {
+        progressContainer.style.display = 'none';
+        alertContainer.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <strong>Error:</strong> ${error.message}
+            </div>
+        `;
+        // Reset button state
+        analyzeButton.disabled = false;
+        buttonText.textContent = '🔍 Analyze Channel';
+        loadingSpinner.style.display = 'none';
+    }
+});
+
+function startPolling(searchId) {
+    const alertContainer = document.getElementById('alertContainer');
+    const buttonText = document.getElementById('buttonText');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressText = document.getElementById('progressText');
+    
+    pollInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/search/${searchId}/status`);
+            const data = await response.json();
+            
+            console.log('Polling status:', data);
+            
+            if (data.status === 'completed') {
+                clearInterval(pollInterval);
+                progressText.textContent = 'Analysis completed! Redirecting to results...';
+                
+                setTimeout(() => {
+                    // Get the full search details
+                    const searchResponse = fetch(`/searches/${searchId}`);
+                    searchResponse.then(response => {
+                        if (response.ok) {
+                            // Redirect to search view page
+                            window.location.href = `/searches/${searchId}`;
+                        } else {
+                            progressContainer.style.display = 'none';
+                            alertContainer.innerHTML = `
+                                <div class="alert alert-success" role="alert">
+                                    <strong>Success:</strong> Analysis completed! <a href="/searches/${searchId}">View results</a>
+                                </div>
+                            `;
+                        }
+                    });
+                }, 1000);
+                
+                resetButton();
+            } else if (data.status === 'failed') {
+                clearInterval(pollInterval);
+                progressContainer.style.display = 'none';
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <strong>Analysis Failed:</strong> ${data.error_message || 'Unknown error occurred'}
+                    </div>
+                `;
+                resetButton();
+            } else if (data.status === 'running') {
+                buttonText.textContent = 'Analyzing Channel...';
+                progressText.textContent = 'Scraping telegram channel messages and metadata...';
+            } else if (data.status === 'pending') {
+                progressText.textContent = 'Analysis queued, waiting to start...';
+            }
+        } catch (error) {
+            console.error('Polling error:', error);
+        }
+    }, 2000); // Poll every 2 seconds
+}
+
+function resetButton() {
+    const analyzeButton = document.getElementById('analyzeButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const progressContainer = document.getElementById('progressContainer');
+    
+    analyzeButton.disabled = false;
+    buttonText.textContent = '🔍 Analyze Channel';
+    loadingSpinner.style.display = 'none';
+    progressContainer.style.display = 'none';
+}
+
+// New Search button functionality
+document.getElementById('newSearchButton').addEventListener('click', function() {
+    // Clear the channel input
+    document.getElementById('channelInput').value = '';
+    
+    // Keep investigation and Tor settings, but reset other elements
+    document.getElementById('forceRedoCheck').checked = false;
+    document.getElementById('maxMessages').value = '50';
+    
+    // Clear results and alerts
+    document.getElementById('alertContainer').innerHTML = '';
+    document.getElementById('progressContainer').style.display = 'none';
+    
+    // Reset button state
+    const analyzeButton = document.getElementById('analyzeButton');
+    const buttonText = document.getElementById('buttonText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    analyzeButton.disabled = false;
+    buttonText.textContent = '🔍 Analyze Channel';
+    loadingSpinner.style.display = 'none';
+    
+    // Stop any ongoing polling
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
+    
+    // Focus on channel input
+    document.getElementById('channelInput').focus();
+});
+
+// Cleanup function when user navigates away
+window.addEventListener('beforeunload', function() {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+    }
+});
+</script>
+{% endblock %}

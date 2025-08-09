@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.swp
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+
+# Virtualenv
+.venv/
+
+# Environment
+.env
+.env.*
+
+# Flask/instance data
+instance/
+*.db
+
+# Certificates and sensitive CA material
+scripts/ca/ca/**
+scripts/ca/out/**
+*.key
+*.p12
+*.csr
+*.crt
+*.pem
+
+# Docker
+*.pid
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files created during development
+/tmp/
+**/tmp_rovodev_*

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
 from flask_login import login_required, current_user
 from ..models import db, User, UserCertificate, AuditLog
 from ..security import PasswordSecurity
@@ -9,6 +9,10 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 import subprocess, pathlib, json, csv, io, base64
 import requests
+import redis
+from rq import Queue
+from rq.job import Job
+from rq.registry import FailedJobRegistry, StartedJobRegistry, FinishedJobRegistry, ScheduledJobRegistry, DeferredJobRegistry
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -289,6 +293,45 @@ def audit_index():
     # admin_required is enforced in before_request of blueprint/app
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(200).all()
     return render_template('admin/audit.html', logs=logs)
+
+@admin_bp.get('/queue')
+@login_required
+def queue_index():
+    r = redis.from_url(current_app.config.get('REDIS_URL', 'redis://127.0.0.1:6379/0'))
+    q = Queue('default', connection=r)
+    failed = FailedJobRegistry('default', connection=r)
+    started = StartedJobRegistry('default', connection=r)
+    finished = FinishedJobRegistry('default', connection=r)
+    scheduled = ScheduledJobRegistry('default', connection=r)
+    deferred = DeferredJobRegistry('default', connection=r)
+    jobs = [Job.fetch(jid, connection=r) for jid in q.job_ids]
+    failed_jobs = [Job.fetch(jid, connection=r) for jid in failed.get_job_ids()]
+    return render_template('admin/queue.html', q=q, jobs=jobs, failed_jobs=failed_jobs, started_count=len(started), finished_count=len(finished), scheduled_count=len(scheduled), deferred_count=len(deferred))
+
+@admin_bp.get('/queue/job/<job_id>')
+@login_required
+def queue_job_detail(job_id):
+    r = redis.from_url(current_app.config.get('REDIS_URL', 'redis://127.0.0.1:6379/0'))
+    job = Job.fetch(job_id, connection=r)
+    return render_template('admin/queue_job.html', job=job)
+
+@admin_bp.post('/queue/requeue/<job_id>')
+@login_required
+def queue_requeue(job_id):
+    r = redis.from_url(current_app.config.get('REDIS_URL', 'redis://127.0.0.1:6379/0'))
+    job = Job.fetch(job_id, connection=r)
+    job.requeue()
+    flash('Job requeued', 'success')
+    return redirect(url_for('admin.queue_index'))
+
+@admin_bp.post('/queue/delete/<job_id>')
+@login_required
+def queue_delete(job_id):
+    r = redis.from_url(current_app.config.get('REDIS_URL', 'redis://127.0.0.1:6379/0'))
+    job = Job.fetch(job_id, connection=r)
+    job.delete()
+    flash('Job deleted', 'success')
+    return redirect(url_for('admin.queue_index'))
 
 @admin_bp.post('/certs/issue')
 @login_required

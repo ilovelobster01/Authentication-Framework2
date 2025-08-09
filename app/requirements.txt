@@ -14,3 +14,6 @@ qrcode[pil]==7.4.2
 email_validator==2.2.0
 pytest==8.2.1
 requests==2.32.3
+redis==5.0.7
+rq==1.16.1
+fakeredis==2.23.2

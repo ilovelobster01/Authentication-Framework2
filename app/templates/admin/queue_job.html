@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% block title %}Job {{ job.id }}{% endblock %}
+{% block content %}
+<h1>Job {{ job.id }}</h1>
+<ul>
+  <li>Func: {{ job.func_name }}</li>
+  <li>Status: {{ job.get_status() }}</li>
+  <li>Enqueued: {{ job.enqueued_at }}</li>
+  <li>Started: {{ job.started_at }}</li>
+  <li>Ended: {{ job.ended_at }}</li>
+</ul>
+<h3>Args</h3>
+<pre>{{ job.args }}</pre>
+<h3>Kwargs</h3>
+<pre>{{ job.kwargs }}</pre>
+<h3>Result</h3>
+<pre>{{ job.result }}</pre>
+<p><a href="{{ url_for('admin.queue_index') }}">Back to queue</a></p>
+{% endblock %}

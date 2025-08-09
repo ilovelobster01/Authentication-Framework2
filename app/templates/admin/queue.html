@@ -1,0 +1,45 @@
+{% extends 'layout.html' %}
+{% block title %}Queue{% endblock %}
+{% block content %}
+<h1>Queue</h1>
+<p>Default queue size: {{ q.count }} | Started: {{ started_count }} | Finished: {{ finished_count }} | Scheduled: {{ scheduled_count }} | Deferred: {{ deferred_count }}</p>
+<h2>Enqueued</h2>
+{% if jobs %}
+<table>
+  <tr><th>ID</th><th>Func</th><th>Enqueued</th><th>Actions</th></tr>
+  {% for j in jobs %}
+  <tr>
+    <td><a href="{{ url_for('admin.queue_job_detail', job_id=j.id) }}">{{ j.id }}</a></td>
+    <td>{{ j.func_name }}</td>
+    <td>{{ j.enqueued_at }}</td>
+    <td>
+      <form method="post" action="{{ url_for('admin.queue_delete', job_id=j.id) }}" class="inline"><button type="submit">Delete</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No jobs enqueued.</p>
+{% endif %}
+
+<h2>Failed</h2>
+{% if failed_jobs %}
+<table>
+  <tr><th>ID</th><th>Func</th><th>Failed at</th><th>Error</th><th>Actions</th></tr>
+  {% for j in failed_jobs %}
+  <tr>
+    <td><a href="{{ url_for('admin.queue_job_detail', job_id=j.id) }}">{{ j.id }}</a></td>
+    <td>{{ j.func_name }}</td>
+    <td>{{ j.ended_at }}</td>
+    <td><pre style="white-space: pre-wrap; max-width: 40em;">{{ j.exc_info }}</pre></td>
+    <td>
+      <form method="post" action="{{ url_for('admin.queue_requeue', job_id=j.id) }}" class="inline"><button type="submit">Requeue</button></form>
+      <form method="post" action="{{ url_for('admin.queue_delete', job_id=j.id) }}" class="inline"><button type="submit">Delete</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No failed jobs.</p>
+{% endif %}
+{% endblock %}

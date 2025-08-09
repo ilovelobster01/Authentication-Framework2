@@ -1,67 +1,163 @@
 #!/usr/bin/env bash
 set -euo pipefail
 MODE="${1:-dev}"
+shift || true
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUN_DIR="$ROOT_DIR/.run"
+LOG_DIR="$ROOT_DIR/.run"
+mkdir -p "$RUN_DIR" "$LOG_DIR"
 
-# Function to stop the app
-stop_app() {
-  echo "Stopping Flask authentication app..."
-  
-  # Find and kill Flask development server
-  FLASK_PIDS=$(pgrep -f "python.*app\.py" || true)
-  if [ -n "$FLASK_PIDS" ]; then
-    echo "Found Flask dev server processes: $FLASK_PIDS"
-    kill $FLASK_PIDS
-    echo "Stopped Flask dev server"
+# Load .env if present to configure app behavior
+if [ -f "$ROOT_DIR/.env" ]; then
+  # shellcheck disable=SC2046
+  export $(grep -v '^#' "$ROOT_DIR/.env" | xargs -r)
+fi
+
+need_venv() {
+  if [ ! -d "$ROOT_DIR/.venv" ]; then
+    echo "Virtualenv not found. Run ./setup.sh first." >&2
+    exit 1
   fi
-  
-  # Find and kill gunicorn processes
-  GUNICORN_PIDS=$(pgrep -f "gunicorn.*app\.wsgi" || true)
-  if [ -n "$GUNICORN_PIDS" ]; then
-    echo "Found Gunicorn processes: $GUNICORN_PIDS"
-    kill $GUNICORN_PIDS
-    echo "Stopped Gunicorn"
-  fi
-  
-  # Check if anything is still running on port 8000
-  PORT_USAGE=$(lsof -ti:8000 || true)
-  if [ -n "$PORT_USAGE" ]; then
-    echo "Warning: Something is still using port 8000 (PID: $PORT_USAGE)"
-    echo "You may need to manually kill it: kill $PORT_USAGE"
-  fi
-  
-  echo "Stop complete."
-  exit 0
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.venv/bin/activate"
+  export PYTHONPATH="$ROOT_DIR:${PYTHONPATH:-}"
 }
 
-# Handle stop command
-if [ "$MODE" = "stop" ]; then
-  stop_app
-fi
+ensure_deps() {
+  need_venv
+  # Install main app deps
+  if [ -f "$ROOT_DIR/app/requirements.txt" ]; then
+    pip show -q requests >/dev/null 2>&1 || pip install -r "$ROOT_DIR/app/requirements.txt"
+  fi
+}
 
-if [ ! -d .venv ]; then
-  echo "Virtualenv not found. Run ./setup.sh first." >&2
-  exit 1
-fi
+pid_is_alive() {
+  local pid="$1"
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
 
-source .venv/bin/activate
-# Load .env if present to configure app behavior (e.g., REQUIRE_MTLS_FOR_LOGIN, ADMIN_REQUIRE_MTLS)
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs -r)
-fi
+write_pid() {
+  echo "$2" > "$RUN_DIR/$1.pid"
+}
 
-if [ "$MODE" = "dev" ]; then
+read_pid() {
+  [ -f "$RUN_DIR/$1.pid" ] && cat "$RUN_DIR/$1.pid" || true
+}
+
+start_app_dev() {
+  ensure_deps
+  need_venv
   export FLASK_ENV=development
-  echo "Starting Flask app in development mode on port 8000..."
-  echo "Press Ctrl+C to stop, or run './run.sh stop' from another terminal"
-  python -m app.app
-elif [ "$MODE" = "prod" ]; then
-  echo "Starting Flask app in production mode with Gunicorn on port 8000..."
-  echo "Run './run.sh stop' to stop the server"
-  exec gunicorn -w 4 -b 0.0.0.0:8000 app.wsgi:app
-else
-  echo "Usage: $0 [dev|prod|stop]" >&2
-  echo "  dev  - Start in development mode (default)"
-  echo "  prod - Start in production mode with Gunicorn"
-  echo "  stop - Stop any running Flask/Gunicorn processes"
-  exit 1
-fi
+  echo "Starting Flask app (dev) on 8000..."
+  nohup python -m app.app >"$LOG_DIR/app.log" 2>&1 &
+  write_pid app "$!"
+  echo "App PID: $(read_pid app) (logs: $LOG_DIR/app.log)"
+}
+
+start_app_prod() {
+  ensure_deps
+  need_venv
+  echo "Starting Flask app (prod) on 8000 via gunicorn..."
+  nohup gunicorn -w 4 -b 0.0.0.0:8000 app.wsgi:app >"$LOG_DIR/app.log" 2>&1 &
+  write_pid app "$!"
+  echo "App PID: $(read_pid app) (logs: $LOG_DIR/app.log)"
+}
+
+start_worker() {
+  need_venv
+  export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379/0}"
+  echo "Starting RQ worker (REDIS_URL=$REDIS_URL)..."
+  nohup python "$ROOT_DIR/app/tasks/worker.py" >"$LOG_DIR/worker.log" 2>&1 &
+  write_pid worker "$!"
+  echo "Worker PID: $(read_pid worker) (logs: $LOG_DIR/worker.log)"
+}
+
+start_mcp() {
+  need_venv
+  pip install -r "$ROOT_DIR/mcp_server/requirements.txt" >/dev/null
+  export FLASK_APP=mcp_server.app
+  export FLASK_RUN_HOST=127.0.0.1
+  # choose an available port starting at MCP_PORT or 9100
+  base_port=${MCP_PORT:-9100}
+  chosen_port=""
+  for p in $(seq "$base_port" $((base_port+20))); do
+    if ! lsof -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then
+      chosen_port="$p"
+      break
+    fi
+  done
+  if [ -z "$chosen_port" ]; then
+    echo "No free port found for MCP in range $base_port-$((base_port+20))" >&2
+    exit 1
+  fi
+  export FLASK_RUN_PORT="$chosen_port"
+  echo "Starting MCP server on $FLASK_RUN_HOST:$FLASK_RUN_PORT..."
+  nohup python -m flask run >"$LOG_DIR/mcp.log" 2>&1 &
+  write_pid mcp "$!"
+  echo "MCP PID: $(read_pid mcp) (logs: $LOG_DIR/mcp.log)"
+  if [ "$chosen_port" != "$base_port" ]; then
+    echo "Note: requested port $base_port was busy; started on $chosen_port instead. Set MCP_PORT to override."
+  fi
+}
+
+stop_one() {
+  local name="$1"
+  local pid
+  pid=$(read_pid "$name")
+  if [ -n "$pid" ] && pid_is_alive "$pid"; then
+    echo "Stopping $name (PID $pid)"
+    kill "$pid" || true
+    sleep 1
+    if pid_is_alive "$pid"; then
+      echo "Force killing $name (PID $pid)"
+      kill -9 "$pid" || true
+    fi
+    rm -f "$RUN_DIR/$name.pid"
+  else
+    echo "$name not running"
+  fi
+}
+
+status() {
+  for n in app worker mcp; do
+    pid=$(read_pid "$n")
+    if [ -n "$pid" ] && pid_is_alive "$pid"; then
+      echo "$n: running (PID $pid)"
+    else
+      echo "$n: stopped"
+    fi
+  done
+}
+
+case "$MODE" in
+  dev)
+    start_app_dev ;;
+  prod)
+    start_app_prod ;;
+  worker)
+    start_worker ;;
+  mcp)
+    start_mcp ;;
+  all|up)
+    start_app_dev
+    start_worker
+    start_mcp ;;
+  stop)
+    stop_one mcp
+    stop_one worker
+    stop_one app ;;
+  status)
+    status ;;
+  *)
+    cat >&2 <<EOF
+Usage: $0 [dev|prod|worker|mcp|all|up|stop|status]
+  dev     Start Flask app (development)
+  prod    Start Flask app (gunicorn)
+  worker  Start RQ worker
+  mcp     Start MCP server
+  all|up  Start app (dev), worker, MCP
+  stop    Stop MCP, worker, app (if running)
+  status  Show process status
+EOF
+    exit 1 ;;
+ esac

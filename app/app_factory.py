@@ -61,6 +61,7 @@ def create_app():
     import os
     db_url = os.environ.get("DATABASE_URL") or "sqlite:///dev.db"
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+    app.config["REDIS_URL"] = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["WTF_CSRF_SSL_STRICT"] = False  # don't require Referer header on HTTPS; rely on CSRF token
 

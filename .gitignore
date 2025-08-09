@@ -38,3 +38,8 @@ Thumbs.db
 # Temp files created during development
 /tmp/
 **/tmp_rovodev_*
+
+# Runtime logs and pids
+.run/
+*.log
+

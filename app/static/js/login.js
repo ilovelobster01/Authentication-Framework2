@@ -20,7 +20,7 @@
     const res = await fetch('/2fa/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ code: qs('totp').value })
+      body: JSON.stringify({ code: qs('totp').value, remember_device: !!qs('remember-device')?.checked })
     });
     let data;
     try { data = await res.json(); } catch (e) { const t = await res.text(); alert(t || 'Invalid code'); return; }

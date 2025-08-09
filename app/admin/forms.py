@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, BooleanField, PasswordField, SubmitField, HiddenField
+from wtforms import StringField, BooleanField, PasswordField, SubmitField, HiddenField, SelectField
 from wtforms.validators import DataRequired, Email, Length, Optional
 
 class CreateUserForm(FlaskForm):
@@ -31,6 +31,13 @@ class UnbindCertForm(FlaskForm):
 class BindCurrentCertForm(FlaskForm):
     user_id = HiddenField(validators=[DataRequired()])
     submit = SubmitField('Bind Current Client Certificate')
+
+class CertFilterForm(FlaskForm):
+    username = StringField('Username', validators=[Optional(), Length(max=80)])
+    fingerprint = StringField('Fingerprint (prefix OK)', validators=[Optional(), Length(max=95)])
+    status = SelectField('Status', choices=[('any','Any'),('active','Active'),('revoked','Revoked')])
+    validity = SelectField('Validity', choices=[('any','Any'),('valid','Valid now'),('expired','Expired'),('future','Not yet valid')])
+    submit = SubmitField('Filter')
 
 class IssueClientCertForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])

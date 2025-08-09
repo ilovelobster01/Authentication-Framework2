@@ -1,0 +1,17 @@
+{% extends 'layout.html' %}
+{% block title %}Certificate Detail{% endblock %}
+{% block content %}
+<h1>Certificate Detail</h1>
+<ul>
+  <li>User: {{ cert.user.username }}</li>
+  <li>Fingerprint (SHA-256): <code>{{ cert.fingerprint_sha256 }}</code></li>
+  <li>Serial: {{ cert.serial_number }}</li>
+  <li>Subject: {{ cert.subject }}</li>
+  <li>Issuer: {{ cert.issuer }}</li>
+  <li>Valid: {{ cert.not_before }} - {{ cert.not_after }}</li>
+  <li>Status: {{ 'Revoked' if cert.is_revoked else 'Active' }}</li>
+  <li>Created: {{ cert.created_at }}</li>
+  {% if cert.revoked_at %}<li>Revoked: {{ cert.revoked_at }}{% endif %}
+</ul>
+<p><a href="{{ url_for('admin.certs_index') }}">Back to certificates</a></p>
+{% endblock %}

@@ -46,6 +46,18 @@ class User(UserMixin, db.Model):
         return str(self.id)
 
 
+class RememberDevice(db.Model):
+    __tablename__ = "remember_devices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    ip = db.Column(db.String(64), nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
 class UserCertificate(db.Model):
     __tablename__ = "user_certificates"
 

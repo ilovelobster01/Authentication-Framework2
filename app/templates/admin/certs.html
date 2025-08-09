@@ -5,24 +5,24 @@
 
 <h2>Issue new client certificate</h2>
 <form method="post" action="{{ url_for('admin.issue_cert') }}">
-  {{ form.hidden_tag() }}
+  {{ issue_form.hidden_tag() }}
   <p>
-    {{ form.username.label }}<br>
-    {{ form.username(size=32) }}
+    {{ issue_form.username.label }}<br>
+    {{ issue_form.username(size=32) }}
   </p>
   <p>
-    {{ form.email.label }}<br>
-    {{ form.email(size=48) }}
+    {{ issue_form.email.label }}<br>
+    {{ issue_form.email(size=48) }}
   </p>
   <p>
-    {{ form.p12_password.label }}<br>
-    {{ form.p12_password(size=32) }}
+    {{ issue_form.p12_password.label }}<br>
+    {{ issue_form.p12_password(size=32) }}
   </p>
   <p>
-    {{ form.ca_password.label }}<br>
-    {{ form.ca_password(size=32) }}
+    {{ issue_form.ca_password.label }}<br>
+    {{ issue_form.ca_password(size=32) }}
   </p>
-  <p>{{ form.submit() }}</p>
+  <p>{{ issue_form.submit() }}</p>
 </form>
 
 {% if issued %}
@@ -32,5 +32,44 @@
     <li>CRT: <a href="{{ url_for('admin.download_cert', username=issued.username, kind='crt') }}">{{ issued.username }}.crt</a></li>
   </ul>
 {% endif %}
+
+<h2>All certificates</h2>
+<form method="get" action="{{ url_for('admin.certs_index') }}">
+  {{ filter_form.hidden_tag() }}
+  <label>Username {{ filter_form.username(size=24) }}</label>
+  <label>Fingerprint {{ filter_form.fingerprint(size=24) }}</label>
+  <label>Status {{ filter_form.status() }}</label>
+  <label>Validity {{ filter_form.validity() }}</label>
+  <button type="submit">Apply</button>
+</form>
+
+<table>
+  <tr><th>User</th><th>Fingerprint</th><th>Subject</th><th>Issuer</th><th>Serial</th><th>Valid</th><th>Status</th><th>Actions</th></tr>
+  {% for c in certs %}
+    <tr>
+      <td><a href="{{ url_for('admin.user_detail', user_id=c.user_id) }}">{{ c.user.username }}</a></td>
+      <td><code>{{ c.fingerprint_sha256 }}</code></td>
+      <td>{{ c.subject }}</td>
+      <td>{{ c.issuer }}</td>
+      <td>{{ c.serial_number }}</td>
+      <td>{{ c.not_before }} - {{ c.not_after }}</td>
+      <td>{{ 'Revoked' if c.is_revoked else 'Active' }}</td>
+      <td>
+        <a href="{{ url_for('admin.cert_view', fingerprint=c.fingerprint_sha256) }}">View</a>
+        {% if c.is_revoked %}
+          <form method="post" action="{{ url_for('admin.unrevoke_cert') }}" class="inline">
+            <input type="hidden" name="fingerprint" value="{{ c.fingerprint_sha256 }}" />
+            <button type="submit">Unrevoke</button>
+          </form>
+        {% else %}
+          <form method="post" action="{{ url_for('admin.revoke_cert_global') }}" class="inline">
+            <input type="hidden" name="fingerprint" value="{{ c.fingerprint_sha256 }}" />
+            <button type="submit">Revoke</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+</table>
 
 {% endblock %}

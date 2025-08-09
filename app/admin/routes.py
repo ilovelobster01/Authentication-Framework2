@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from ..models import db, User, UserCertificate, AuditLog
 from ..security import PasswordSecurity
 from .. import cert_utils as cu
-from .forms import CreateUserForm, ResetPasswordForm, ToggleActiveForm, ResetTOTPForm, UnbindCertForm, BindCurrentCertForm, IssueClientCertForm
+from .forms import CreateUserForm, ResetPasswordForm, ToggleActiveForm, ResetTOTPForm, UnbindCertForm, BindCurrentCertForm, IssueClientCertForm, CertFilterForm
 from urllib.parse import unquote
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -161,6 +161,32 @@ def reset_totp():
         return redirect(url_for('admin.user_detail', user_id=user.id))
     abort(400)
 
+@admin_bp.post('/certs/revoke')
+@login_required
+def revoke_cert_global():
+    fp = request.form.get('fingerprint')
+    if not fp:
+        abort(400)
+    c = UserCertificate.query.filter_by(fingerprint_sha256=fp).first_or_404()
+    c.is_revoked = True
+    c.revoked_at = db.func.now()
+    db.session.commit()
+    flash('Certificate revoked', 'success')
+    return redirect(url_for('admin.certs_index'))
+
+@admin_bp.post('/certs/unrevoke')
+@login_required
+def unrevoke_cert():
+    fp = request.form.get('fingerprint')
+    if not fp:
+        abort(400)
+    c = UserCertificate.query.filter_by(fingerprint_sha256=fp).first_or_404()
+    c.is_revoked = False
+    c.revoked_at = None
+    db.session.commit()
+    flash('Certificate unrevoked', 'success')
+    return redirect(url_for('admin.certs_index'))
+
 @admin_bp.post('/users/revoke_cert')
 @login_required
 def revoke_cert():
@@ -179,11 +205,40 @@ def revoke_cert():
         return redirect(url_for('admin.user_detail', user_id=user.id))
     abort(400)
 
+@admin_bp.get('/certs/view/<fingerprint>')
+@login_required
+def cert_view(fingerprint: str):
+    cert = UserCertificate.query.filter_by(fingerprint_sha256=fingerprint).first_or_404()
+    return render_template('admin/cert_detail.html', cert=cert)
+
 @admin_bp.get('/certs')
 @login_required
 def certs_index():
-    form = IssueClientCertForm()
-    return render_template('admin/certs.html', form=form, issued=None)
+    issue_form = IssueClientCertForm()
+    filter_form = CertFilterForm(request.args)
+    q = UserCertificate.query.join(User, User.id == UserCertificate.user_id)
+    # Apply filters
+    if filter_form.username.data:
+        q = q.filter(User.username.ilike(f"%{filter_form.username.data.strip()}%"))
+    if filter_form.fingerprint.data:
+        q = q.filter(UserCertificate.fingerprint_sha256.ilike(f"{filter_form.fingerprint.data.strip()}%"))
+    if filter_form.status.data and filter_form.status.data != 'any':
+        if filter_form.status.data == 'active':
+            q = q.filter(UserCertificate.is_revoked.is_(False))
+        elif filter_form.status.data == 'revoked':
+            q = q.filter(UserCertificate.is_revoked.is_(True))
+    # Validity filter
+    from datetime import datetime as _dt
+    now = _dt.utcnow()
+    if filter_form.validity.data and filter_form.validity.data != 'any':
+        if filter_form.validity.data == 'valid':
+            q = q.filter((UserCertificate.not_before.is_(None) | (UserCertificate.not_before <= now)) & (UserCertificate.not_after.is_(None) | (UserCertificate.not_after >= now)))
+        elif filter_form.validity.data == 'expired':
+            q = q.filter(UserCertificate.not_after.isnot(None) & (UserCertificate.not_after < now))
+        elif filter_form.validity.data == 'future':
+            q = q.filter(UserCertificate.not_before.isnot(None) & (UserCertificate.not_before > now))
+    certs = q.order_by(User.username.asc(), UserCertificate.created_at.desc()).all()
+    return render_template('admin/certs.html', issue_form=issue_form, filter_form=filter_form, certs=certs, issued=None)
 
 @admin_bp.get('/audit')
 @login_required

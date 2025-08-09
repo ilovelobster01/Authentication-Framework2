@@ -2,7 +2,8 @@
 {% block title %}Login{% endblock %}
 {% block content %}
 <h1>Login</h1>
-<form id="login-form">
+{% set pending_2fa = session.get('pending_2fa_user_id') %}
+<form id="login-form" {% if pending_2fa %}class="hidden"{% endif %}>
   <p>
     <label>Username<br><input type="text" id="username" /></label>
   </p>
@@ -12,9 +13,12 @@
   <button type="button" id="btn-login">Login</button>
 </form>
 
-<form id="totp-form" class="hidden">
+<form id="totp-form" {% if not pending_2fa %}class="hidden"{% endif %}>
   <p>
-    <label>Authenticator code<br><input type="text" id="totp" /></label>
+    <label>Authenticator code<br><input type="text" id="totp" inputmode="numeric" pattern="[0-9]*" maxlength="6" /></label>
+  </p>
+  <p>
+    <label><input type="checkbox" id="remember-device" /> Remember this device for 30 days</label>
   </p>
   <button type="button" id="btn-verify-totp">Verify</button>
 </form>

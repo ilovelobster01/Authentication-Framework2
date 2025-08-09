@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from flask import Flask, jsonify, request, abort
@@ -15,7 +15,7 @@ from . import cert_utils as cu
 from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 
-from .models import db, User, UserCertificate, AuditLog
+from .models import db, User, UserCertificate, AuditLog, RememberDevice
 from .security import PasswordSecurity
 import pyotp
 import qrcode
@@ -79,6 +79,39 @@ def create_app():
     login_manager.init_app(app)
 
     pwdsec = PasswordSecurity()
+
+    # Remember-device helpers
+    import os, secrets
+    from hashlib import sha256 as _sha256
+
+    REMEMBER_COOKIE = 'remember_2fa'
+    REMEMBER_DAYS = int(os.environ.get('REMEMBER_2FA_DAYS', '30'))
+
+    def _hash_token(tok: str) -> str:
+        return _sha256(tok.encode('utf-8')).hexdigest().upper()
+
+    def set_remember_cookie(resp, user: User):
+        # Create token, store hash with expiry
+        tok = secrets.token_urlsafe(32)
+        h = _hash_token(tok)
+        exp = datetime.utcnow() + timedelta(days=REMEMBER_DAYS)
+        rd = RememberDevice(user_id=user.id, token_hash=h, user_agent=request.headers.get('User-Agent'), ip=request.headers.get('X-Forwarded-For', request.remote_addr), expires_at=exp)
+        db.session.add(rd)
+        db.session.commit()
+        resp.set_cookie(REMEMBER_COOKIE, tok, max_age=REMEMBER_DAYS*24*3600, httponly=True, secure=True, samesite='Lax', path='/')
+        return resp
+
+    def check_remember_cookie(user: User) -> bool:
+        tok = request.cookies.get(REMEMBER_COOKIE)
+        if not tok:
+            return False
+        h = _hash_token(tok)
+        rd = RememberDevice.query.filter_by(token_hash=h, user_id=user.id).first()
+        if not rd:
+            return False
+        if rd.expires_at < datetime.utcnow():
+            return False
+        return True
 
     @login_manager.user_loader
     def load_user(user_id: str):
@@ -205,8 +238,12 @@ def create_app():
                 log_event('login_failed', {'username': username, 'reason': 'mtls_binding_missing_or_invalid', 'fingerprint': presented_fpr}, user=user)
                 abort(401, description="Valid bound certificate required")
 
-        # If TOTP is enabled, require it
+        # If TOTP is enabled, honor remember-device cookie; else require 2FA
         if user.totp_enabled:
+            if check_remember_cookie(user):
+                login_user(user)
+                log_event('login_success_remember2fa', {'username': username})
+                return {"status": "ok"}, 200
             from flask import session
             session["pending_2fa_user_id"] = user.id
             log_event('login_pending_2fa', {'username': username})
@@ -251,6 +288,7 @@ def create_app():
         b64 = base64.b64encode(buf.getvalue()).decode("ascii")
         return {"secret": secret, "otpauth_uri": uri, "qr_data_url": f"data:image/png;base64,{b64}"}, 200
 
+    @csrf.exempt
     @app.post("/2fa/enable")
     @login_required
     def enable_2fa():

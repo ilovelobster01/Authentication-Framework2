@@ -44,6 +44,10 @@ if [ ! -d .venv ]; then
 fi
 
 source .venv/bin/activate
+# Load .env if present to configure app behavior (e.g., REQUIRE_MTLS_FOR_LOGIN, ADMIN_REQUIRE_MTLS)
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs -r)
+fi
 
 if [ "$MODE" = "dev" ]; then
   export FLASK_ENV=development

@@ -85,7 +85,8 @@ server {
     add_header X-Frame-Options DENY;
     add_header X-Content-Type-Options nosniff;
     add_header Referrer-Policy strict-origin-when-cross-origin;
-    add_header Content-Security-Policy "default-src 'self'";
+    # Content Security Policy: disallow inline; allow QR data: images
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'";
 
     location /healthz {
         proxy_pass http://flask_local/healthz;

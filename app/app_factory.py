@@ -15,7 +15,7 @@ from . import cert_utils as cu
 from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 
-from .models import db, User, UserCertificate
+from .models import db, User, UserCertificate, AuditLog
 from .security import PasswordSecurity
 import pyotp
 import qrcode
@@ -58,13 +58,16 @@ def create_app():
 
     # Minimal config; in next steps we'll externalize to env vars
     app.config["SECRET_KEY"] = app.config.get("SECRET_KEY") or "dev-insecure-change-me"
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///dev.db"
+    import os
+    db_url = os.environ.get("DATABASE_URL") or "sqlite:///dev.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["WTF_CSRF_SSL_STRICT"] = False  # don't require Referer header on HTTPS; rely on CSRF token
 
     # Dev-friendly: allow password/TOTP login without mTLS unless explicitly required
     import os
     app.config["REQUIRE_MTLS_FOR_LOGIN"] = os.environ.get("REQUIRE_MTLS_FOR_LOGIN", "0") == "1"
+    app.config["ADMIN_REQUIRE_MTLS"] = os.environ.get("ADMIN_REQUIRE_MTLS", "1") == "1"
 
     db.init_app(app)
     Migrate(app, db)
@@ -93,6 +96,20 @@ def create_app():
             return None
         return cu.sha256_fingerprint(cert)
 
+    def log_event(event_type: str, details: dict | None = None, user: User | None = None, status: str | None = None):
+        try:
+            entry = AuditLog(
+                user_id=(user.id if user else (current_user.id if current_user.is_authenticated else None)),
+                event_type=event_type,
+                ip=request.headers.get('X-Forwarded-For', request.remote_addr),
+                user_agent=request.headers.get('User-Agent'),
+                details=(jsonify(details).get_data(as_text=True) if details else None),
+            )
+            db.session.add(entry)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     def require_client_cert():
         if not get_presented_cert_fpr():
             abort(401, description="Client certificate required")
@@ -100,6 +117,34 @@ def create_app():
     @app.get("/healthz")
     def healthz():
         return "ok", 200
+
+    @app.before_request
+    def enforce_session_and_admin_mtls():
+        # Skip static and health
+        p = request.path or ""
+        if p.startswith('/static/') or p == '/healthz':
+            return
+        if current_user.is_authenticated:
+            fpr = get_presented_cert_fpr()
+            if fpr:
+                any_binding = UserCertificate.query.filter_by(fingerprint_sha256=fpr, is_revoked=False).first()
+                if any_binding and any_binding.user_id != current_user.id:
+                    log_event('session_cert_user_mismatch', {'fingerprint': fpr})
+                    logout_user()
+                    abort(401, description="Certificate does not match logged-in user")
+                if any_binding and not any_binding.is_valid_now():
+                    log_event('session_cert_invalid', {'fingerprint': fpr})
+                    logout_user()
+                    abort(401, description="Certificate not valid for this user")
+            # Admin-only mTLS enforcement: accessing /admin requires verified, bound, valid cert
+            if p.startswith('/admin') and current_user.is_admin and app.config.get("ADMIN_REQUIRE_MTLS", True):
+                if not fpr:
+                    log_event('admin_access_denied', {'reason': 'mtls_required'})
+                    abort(401, description="Admin requires mTLS certificate")
+                binding = UserCertificate.query.filter_by(user_id=current_user.id, fingerprint_sha256=fpr, is_revoked=False).first()
+                if not binding or not binding.is_valid_now():
+                    log_event('admin_access_denied', {'reason': 'binding_missing_or_invalid', 'fingerprint': fpr})
+                    abort(401, description="Admin requires valid bound certificate")
 
     @app.get("/mtls/status")
     def mtls_status():
@@ -135,6 +180,7 @@ def create_app():
             abort(400, description="username and password required")
         user = User.query.filter_by(username=username).first()
         if not user or not user.is_active or not user.password_hash or not pwdsec.verify(user.password_hash, password):
+            log_event('login_failed', {'username': username, 'reason': 'invalid_credentials'})
             abort(401, description="Invalid credentials")
 
         # If a verified client cert was presented, it must belong to this user (even when not strictly required)
@@ -143,24 +189,30 @@ def create_app():
             any_binding = UserCertificate.query.filter_by(fingerprint_sha256=presented_fpr, is_revoked=False).first()
             if any_binding:
                 if any_binding.user_id != user.id:
+                    log_event('login_failed', {'username': username, 'reason': 'cert_user_mismatch', 'fingerprint': presented_fpr}, user=user)
                     abort(401, description="Presented certificate belongs to a different user")
                 if not any_binding.is_valid_now():
+                    log_event('login_failed', {'username': username, 'reason': 'cert_invalid', 'fingerprint': presented_fpr}, user=user)
                     abort(401, description="Presented certificate is not valid")
 
         # Require mTLS certificate bound to this user when explicitly enabled
         if app.config.get("REQUIRE_MTLS_FOR_LOGIN", False):
             if not presented_fpr:
+                log_event('login_failed', {'username': username, 'reason': 'mtls_required'})
                 abort(401, description="mTLS certificate required")
             binding = UserCertificate.query.filter_by(user_id=user.id, fingerprint_sha256=presented_fpr, is_revoked=False).first()
             if not binding or not binding.is_valid_now():
+                log_event('login_failed', {'username': username, 'reason': 'mtls_binding_missing_or_invalid', 'fingerprint': presented_fpr}, user=user)
                 abort(401, description="Valid bound certificate required")
 
         # If TOTP is enabled, require it
         if user.totp_enabled:
             from flask import session
             session["pending_2fa_user_id"] = user.id
+            log_event('login_pending_2fa', {'username': username})
             return {"status": "2fa_required"}, 200
         login_user(user)
+        log_event('login_success', {'username': username})
         return {"status": "ok"}, 200
 
     @csrf.exempt
@@ -221,6 +273,7 @@ def create_app():
     @login_required
     def logout():
         # Allow GET so the header link works; POST also supported
+        log_event('logout', {'user': current_user.username if current_user.is_authenticated else None})
         logout_user()
         flash('Logged out', 'success')
         return redirect(url_for('login_page'))
@@ -229,6 +282,11 @@ def create_app():
     @login_required
     def me():
         return {"id": current_user.id, "username": current_user.username, "email": current_user.email, "is_admin": current_user.is_admin}, 200
+
+    @app.get("/profile")
+    @login_required
+    def profile_page():
+        return render_template('profile.html', user=current_user)
 
     @app.get("/")
     def root_index():

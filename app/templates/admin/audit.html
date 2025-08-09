@@ -1,0 +1,18 @@
+{% extends 'layout.html' %}
+{% block title %}Audit Log{% endblock %}
+{% block content %}
+<h1>Audit Log (latest {{ logs|length }})</h1>
+<table>
+  <tr><th>Time</th><th>User</th><th>Type</th><th>IP</th><th>User-Agent</th><th>Details</th></tr>
+  {% for e in logs %}
+  <tr>
+    <td>{{ e.created_at }}</td>
+    <td>{% if e.user %}{{ e.user.username }}{% else %}-{% endif %}</td>
+    <td>{{ e.event_type }}</td>
+    <td>{{ e.ip }}</td>
+    <td>{{ e.user_agent }}</td>
+    <td><pre style="white-space: pre-wrap;">{{ e.details }}</pre></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

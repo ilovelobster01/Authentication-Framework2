@@ -1,0 +1,29 @@
+{% extends 'layout.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<h1>Profile</h1>
+<p>
+  Username: {{ user.username }}<br>
+  Email: {{ user.email }}<br>
+  2FA Enabled: {{ 'Yes' if user.totp_enabled else 'No' }}
+</p>
+
+<h2>Two-Factor Authentication (TOTP)</h2>
+<div id="totp-setup">
+  {% if not user.totp_enabled %}
+    <button id="btn-gen-qr">Generate 2FA QR</button>
+    <div id="qr-block" class="hidden">
+      <p>Scan this QR code in your authenticator app and enter the current 6-digit code:</p>
+      <img id="qr-img" alt="QR Code" />
+      <p>Secret: <code id="totp-secret"></code></p>
+      <form id="totp-enable-form">
+        <input type="text" id="totp-code" placeholder="123456" maxlength="6" />
+        <button type="submit">Enable 2FA</button>
+      </form>
+    </div>
+    <script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+  {% else %}
+    <p>2FA is enabled for your account.</p>
+  {% endif %}
+</div>
+{% endblock %}

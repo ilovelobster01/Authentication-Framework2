@@ -13,6 +13,8 @@
       |
       <a href="/admin/certs">Certificates</a>
       |
+      {% if current_user.is_authenticated and current_user.is_admin %}<a href="/admin/audit">Audit</a> |{% endif %}
+      <a href="/profile">Profile</a> |
       <a href="/logout">Logout</a>
     </nav>
     {% for cat, msg in get_flashed_messages(with_categories=true) %}

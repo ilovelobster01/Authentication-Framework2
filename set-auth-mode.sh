@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# set-auth-mode.sh — robustly switch Nginx client cert verification mode
+# set-auth-mode.sh — DEPRECATED. Use set-nginx-auth-mode.sh instead.
+# This is a thin wrapper kept for backward compatibility to switch Nginx client cert verification mode
 # Modes:
 #   on       -> ssl_verify_client on;
 #   optional -> ssl_verify_client optional;
@@ -96,4 +97,10 @@ main() {
   esac
 }
 
-main "$@"
+# Back-compat wrapper
+if [ -x "$(dirname "$0")/set-nginx-auth-mode.sh" ]; then
+  exec "$(dirname "$0")/set-nginx-auth-mode.sh" "$@"
+else
+  echo "Please run: sudo bash set-nginx-auth-mode.sh on|optional|off|show" >&2
+  exit 1
+fi

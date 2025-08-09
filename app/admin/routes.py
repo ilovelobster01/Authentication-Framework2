@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
-from ..models import db, User, UserCertificate
+from ..models import db, User, UserCertificate, AuditLog
 from ..security import PasswordSecurity
 from .. import cert_utils as cu
 from .forms import CreateUserForm, ResetPasswordForm, ToggleActiveForm, ResetTOTPForm, UnbindCertForm, BindCurrentCertForm, IssueClientCertForm
@@ -184,6 +184,13 @@ def revoke_cert():
 def certs_index():
     form = IssueClientCertForm()
     return render_template('admin/certs.html', form=form, issued=None)
+
+@admin_bp.get('/audit')
+@login_required
+def audit_index():
+    # admin_required is enforced in before_request of blueprint/app
+    logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(200).all()
+    return render_template('admin/audit.html', logs=logs)
 
 @admin_bp.post('/certs/issue')
 @login_required

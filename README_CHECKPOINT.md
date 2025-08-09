@@ -14,12 +14,17 @@ Scope of changes since initial:
 - Routes:
   - Root redirects to /login; logout accepts GET/POST.
 - Nginx (host): added reference mtls_flask.conf.
+- CA API microservice (ca_api/): optional issuer that holds CA secrets privately and returns base64 artifacts.
+  - Backends: local OpenSSL scripts or FreeIPA (via Kerberos + ipa CLI).
 - Fix cryptography naive datetime deprecation: use not_valid_before_utc / not_valid_after_utc; store as naive UTC.
 - Added stop.sh and run.sh stop support for native dev.
 
 Notes and TODOs:
 - For production, consider moving CA key operations behind a service or approval flow. Avoid passing CA passwords via form in long term.
 - Consider strict optional-mTLS mode (reject login if presented cert is unbound).
+- Added .env toggles: REQUIRE_MTLS_FOR_LOGIN, ADMIN_REQUIRE_MTLS, REMEMBER_2FA_DAYS (see .env.example).
+- Cert Management UI: filters (username, fingerprint, status, validity), CSV export, pagination; detail and revoke/unrevoke actions.
+- Profile: Manage remembered devices (list/remove/remove-all).
 - Optionally add audit logging of cert issuance, binding, and login attempts.
 
 How to run:

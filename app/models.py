@@ -41,6 +41,7 @@ class User(UserMixin, db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     certificates = db.relationship("UserCertificate", backref="user", lazy=True)
+    remembered_devices = db.relationship("RememberDevice", backref="user", lazy=True)
 
     def get_id(self):
         return str(self.id)

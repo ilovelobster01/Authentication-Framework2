@@ -35,5 +35,9 @@
     const bv = qs('btn-verify-totp');
     if (bl) bl.addEventListener('click', doLogin);
     if (bv) bv.addEventListener('click', doVerifyTotp);
+    const pwd = qs('password');
+    if (pwd) pwd.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); doLogin(); } });
+    const totp = qs('totp');
+    if (totp) totp.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); doVerifyTotp(); } });
   });
 })();

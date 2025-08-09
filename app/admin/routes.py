@@ -4,10 +4,11 @@ from ..models import db, User, UserCertificate, AuditLog
 from ..security import PasswordSecurity
 from .. import cert_utils as cu
 from .forms import CreateUserForm, ResetPasswordForm, ToggleActiveForm, ResetTOTPForm, UnbindCertForm, BindCurrentCertForm, IssueClientCertForm, CertFilterForm
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
-import subprocess, pathlib
+import subprocess, pathlib, json, csv, io, base64
+import requests
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -20,6 +21,20 @@ def client_out_dir(username: str) -> str:
 
 
 pwdsec = PasswordSecurity()
+
+def audit(event_type: str, details: dict | None = None):
+    try:
+        entry = AuditLog(
+            user_id=current_user.id if current_user.is_authenticated else None,
+            event_type=event_type,
+            ip=request.headers.get('X-Forwarded-For', request.remote_addr),
+            user_agent=request.headers.get('User-Agent'),
+            details=json.dumps(details) if details else None,
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 def admin_required():
     if not current_user.is_authenticated:
@@ -171,6 +186,7 @@ def revoke_cert_global():
     c.is_revoked = True
     c.revoked_at = db.func.now()
     db.session.commit()
+    audit('cert_revoked', {'fingerprint': fp, 'user': c.user.username})
     flash('Certificate revoked', 'success')
     return redirect(url_for('admin.certs_index'))
 
@@ -184,6 +200,7 @@ def unrevoke_cert():
     c.is_revoked = False
     c.revoked_at = None
     db.session.commit()
+    audit('cert_unrevoked', {'fingerprint': fp, 'user': c.user.username})
     flash('Certificate unrevoked', 'success')
     return redirect(url_for('admin.certs_index'))
 
@@ -209,6 +226,7 @@ def revoke_cert():
 @login_required
 def cert_view(fingerprint: str):
     cert = UserCertificate.query.filter_by(fingerprint_sha256=fingerprint).first_or_404()
+    audit('cert_view', {'fingerprint': fingerprint, 'user': cert.user.username})
     return render_template('admin/cert_detail.html', cert=cert)
 
 @admin_bp.get('/certs')
@@ -237,8 +255,33 @@ def certs_index():
             q = q.filter(UserCertificate.not_after.isnot(None) & (UserCertificate.not_after < now))
         elif filter_form.validity.data == 'future':
             q = q.filter(UserCertificate.not_before.isnot(None) & (UserCertificate.not_before > now))
-    certs = q.order_by(User.username.asc(), UserCertificate.created_at.desc()).all()
-    return render_template('admin/certs.html', issue_form=issue_form, filter_form=filter_form, certs=certs, issued=None)
+    # Pagination
+    page = max(int(request.args.get('page', 1) or 1), 1)
+    per_page = min(max(int(request.args.get('per_page', 25) or 25), 1), 200)
+
+    q = q.order_by(User.username.asc(), UserCertificate.created_at.desc())
+
+    # CSV export of filtered set (all rows)
+    if (request.args.get('export') or '').lower() == 'csv':
+        out = io.StringIO()
+        w = csv.writer(out)
+        w.writerow(['username','fingerprint_sha256','serial','subject','issuer','not_before','not_after','is_revoked'])
+        for c in q.all():
+            w.writerow([c.user.username, c.fingerprint_sha256, c.serial_number, c.subject, c.issuer, c.not_before, c.not_after, c.is_revoked])
+        from flask import Response
+        return Response(out.getvalue(), mimetype='text/csv', headers={'Content-Disposition': 'attachment; filename="certs.csv"'})
+
+    total = q.count()
+    certs = q.offset((page-1)*per_page).limit(per_page).all()
+
+    params = request.args.to_dict(flat=True)
+    base = url_for('admin.certs_index')
+    export_url = base + '?' + urlencode({**params, 'export': 'csv'})
+    last_page = ((total - 1) // per_page) + 1 if total else 1
+    prev_url = base + '?' + urlencode({**params, 'page': page-1, 'per_page': per_page}) if page > 1 else None
+    next_url = base + '?' + urlencode({**params, 'page': page+1, 'per_page': per_page}) if page < last_page else None
+
+    return render_template('admin/certs.html', issue_form=issue_form, filter_form=filter_form, certs=certs, issued=None, page=page, per_page=per_page, total=total, last_page=last_page, export_url=export_url, prev_url=prev_url, next_url=next_url)
 
 @admin_bp.get('/audit')
 @login_required
@@ -259,18 +302,55 @@ def issue_cert():
         if not SAFE_UNAME_RE.match(uname):
             flash('Invalid username for certificate', 'error')
             return redirect(url_for('admin.certs_index'))
-        # Call script non-interactively
-        script = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'scripts', 'ca', 'issue_client.sh')
-        script = os.path.abspath(script)
-        try:
-            env = os.environ.copy()
-            # Pass as 4th arg to avoid env leakage
-            cmd = [script, uname, email, p12_pass, ca_pass]
-            subprocess.check_call(cmd, cwd=os.path.abspath(os.path.join(script, '..')), env=env)
-        except subprocess.CalledProcessError as e:
-            flash('Certificate issuance failed', 'error')
-            return redirect(url_for('admin.certs_index'))
-        out_dir = os.path.abspath(os.path.join(os.path.dirname(script), 'out', 'clients', uname))
+
+        # Output dir
+        base_scripts = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'scripts', 'ca'))
+        out_dir = os.path.abspath(os.path.join(base_scripts, 'out', 'clients', uname))
+        os.makedirs(out_dir, exist_ok=True)
+
+        issuer_mode = os.environ.get('CA_ISSUER', 'local').lower()
+        if issuer_mode == 'http':
+            api_url = os.environ.get('CA_API_URL')
+            api_token = os.environ.get('CA_API_TOKEN')
+            if not api_url or not api_token:
+                flash('CA API configuration missing (CA_API_URL/CA_API_TOKEN)', 'error')
+                return redirect(url_for('admin.certs_index'))
+            try:
+                r = requests.post(api_url.rstrip('/') + '/issue', json={
+                    'username': uname,
+                    'email': email,
+                    'p12_password': p12_pass,
+                }, headers={'Authorization': f'Bearer {api_token}'}, timeout=60)
+                r.raise_for_status()
+                data = r.json()
+            except Exception as e:
+                flash('Certificate issuance via API failed', 'error')
+                return redirect(url_for('admin.certs_index'))
+            # Expect base64 fields: crt, key, p12
+            try:
+                crt_b = base64.b64decode(data.get('crt',''))
+                key_b = base64.b64decode(data.get('key',''))
+                p12_b = base64.b64decode(data.get('p12',''))
+                with open(os.path.join(out_dir, f"{uname}.crt"), 'wb') as f: f.write(crt_b)
+                with open(os.path.join(out_dir, f"{uname}.key"), 'wb') as f: f.write(key_b)
+                with open(os.path.join(out_dir, f"{uname}.p12"), 'wb') as f: f.write(p12_b)
+                os.chmod(os.path.join(out_dir, f"{uname}.key"), 0o600)
+                os.chmod(os.path.join(out_dir, f"{uname}.p12"), 0o600)
+            except Exception:
+                flash('Failed to save issued certificate artifacts', 'error')
+                return redirect(url_for('admin.certs_index'))
+        else:
+            # Local shell issuance
+            script = os.path.join(base_scripts, 'issue_client.sh')
+            try:
+                env = os.environ.copy()
+                cmd = [script, uname, email, p12_pass, ca_pass]
+                subprocess.check_call(cmd, cwd=base_scripts, env=env)
+            except subprocess.CalledProcessError:
+                flash('Certificate issuance failed', 'error')
+                return redirect(url_for('admin.certs_index'))
+
+        # Verify output
         if not os.path.isdir(out_dir):
             flash('Certificate output not found', 'error')
             return redirect(url_for('admin.certs_index'))

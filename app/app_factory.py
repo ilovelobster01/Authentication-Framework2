@@ -326,6 +326,29 @@ def create_app():
     def profile_page():
         return render_template('profile.html', user=current_user)
 
+    @app.get('/profile/devices')
+    @login_required
+    def devices_page():
+        devs = RememberDevice.query.filter_by(user_id=current_user.id).order_by(RememberDevice.created_at.desc()).all()
+        return render_template('devices.html', devices=devs)
+
+    @app.post('/profile/devices/revoke/<int:device_id>')
+    @login_required
+    def revoke_device(device_id: int):
+        rd = RememberDevice.query.filter_by(id=device_id, user_id=current_user.id).first_or_404()
+        db.session.delete(rd)
+        db.session.commit()
+        flash('Device removed', 'success')
+        return redirect(url_for('devices_page'))
+
+    @app.post('/profile/devices/revoke_all')
+    @login_required
+    def revoke_all_devices():
+        RememberDevice.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
+        flash('All devices removed', 'success')
+        return redirect(url_for('devices_page'))
+
     @app.get("/")
     def root_index():
         return redirect(url_for('login_page'))

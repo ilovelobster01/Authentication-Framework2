@@ -43,5 +43,5 @@ class IssueClientCertForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     email = StringField('Email', validators=[DataRequired(), Email(), Length(max=255)])
     p12_password = PasswordField('P12 Export Password', validators=[DataRequired(), Length(min=6, max=255)])
-    ca_password = PasswordField('CA Signing Password', validators=[DataRequired(), Length(min=6, max=255)])
+    ca_password = PasswordField('CA Signing Password (local mode only)', validators=[Optional(), Length(min=0, max=255)])
     submit = SubmitField('Issue Client Certificate (.p12)')

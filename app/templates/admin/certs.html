@@ -43,6 +43,10 @@
   <button type="submit">Apply</button>
 </form>
 
+<p>
+  <a href="{{ export_url }}">Export CSV</a>
+</p>
+
 <table>
   <tr><th>User</th><th>Fingerprint</th><th>Subject</th><th>Issuer</th><th>Serial</th><th>Valid</th><th>Status</th><th>Actions</th></tr>
   {% for c in certs %}
@@ -71,5 +75,15 @@
     </tr>
   {% endfor %}
 </table>
+
+<div class="pagination">
+  {% if prev_url %}
+    <a href="{{ prev_url }}">&laquo; Prev</a>
+  {% endif %}
+  <span>Page {{ page }} of {{ last_page }} ({{ total }} total)</span>
+  {% if next_url %}
+    <a href="{{ next_url }}">Next &raquo;</a>
+  {% endif %}
+</div>
 
 {% endblock %}

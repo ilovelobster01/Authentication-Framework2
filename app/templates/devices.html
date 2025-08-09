@@ -1,0 +1,28 @@
+{% extends 'layout.html' %}
+{% block title %}Remembered Devices{% endblock %}
+{% block content %}
+<h1>Remembered Devices</h1>
+{% if devices %}
+<table>
+  <tr><th>Created</th><th>Expires</th><th>IP</th><th>User-Agent</th><th>Action</th></tr>
+  {% for d in devices %}
+    <tr>
+      <td>{{ d.created_at }}</td>
+      <td>{{ d.expires_at }}</td>
+      <td>{{ d.ip }}</td>
+      <td>{{ d.user_agent }}</td>
+      <td>
+        <form method="post" action="{{ url_for('revoke_device', device_id=d.id) }}" class="inline">
+          <button type="submit">Remove</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+</table>
+<form method="post" action="{{ url_for('revoke_all_devices') }}">
+  <button type="submit">Remove All</button>
+</form>
+{% else %}
+<p>No remembered devices.</p>
+{% endif %}
+{% endblock %}

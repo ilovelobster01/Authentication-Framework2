@@ -7,20 +7,33 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
 </head>
 <body>
-  <div class="container">
+  <header class="topbar">
+    <div class="brand">AuthFW</div>
     {% if current_user.is_authenticated %}
-    <nav>
-      <a href="/admin/">Users</a>
-      |
-      <a href="/admin/certs">Certificates</a>
-      |
-      <a href="/admin/queue">Queue</a>
-      |
-      {% if current_user.is_admin %}<a href="/admin/audit">Audit</a> |{% endif %}
-      <a href="/profile">Profile</a> |
-      <a href="/logout">Logout</a>
+    <nav class="menu">
+      <div class="menu-item dropdown">
+        <button class="dropbtn">Admin ▾</button>
+        <div class="dropdown-content">
+          <a href="/admin/">Users</a>
+          <a href="/admin/certs">Certificates</a>
+          <a href="/admin/queue">Queue</a>
+          <a href="/admin/downloaders">Downloaders</a>
+          {% if current_user.is_admin %}<a href="/admin/audit">Audit</a>{% endif %}
+        </div>
+      </div>
+      <div class="menu-item dropdown">
+        <button class="dropbtn">Account ▾</button>
+        <div class="dropdown-content">
+          <a href="/downloads">Downloads</a>
+          <a href="/profile">Profile</a>
+          <a href="/profile/devices">Devices</a>
+          <a href="/logout">Logout</a>
+        </div>
+      </div>
     </nav>
     {% endif %}
+  </header>
+  <div class="container">
     {% for cat, msg in get_flashed_messages(with_categories=true) %}
       <div class="flash {{ cat }}">{{ msg }}</div>
     {% endfor %}

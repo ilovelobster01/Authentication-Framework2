@@ -31,7 +31,7 @@
     <td><a href="{{ url_for('admin.queue_job_detail', job_id=j.id) }}">{{ j.id }}</a></td>
     <td>{{ j.func_name }}</td>
     <td>{{ j.ended_at }}</td>
-    <td><pre style="white-space: pre-wrap; max-width: 40em;">{{ j.exc_info }}</pre></td>
+    <td><pre class="pre-wrap-40">{{ j.exc_info }}</pre></td>
     <td>
       <form method="post" action="{{ url_for('admin.queue_requeue', job_id=j.id) }}" class="inline"><button type="submit">Requeue</button></form>
       <form method="post" action="{{ url_for('admin.queue_delete', job_id=j.id) }}" class="inline"><button type="submit">Delete</button></form>

@@ -28,6 +28,8 @@ ensure_deps() {
   # Install main app deps
   if [ -f "$ROOT_DIR/app/requirements.txt" ]; then
     pip show -q requests >/dev/null 2>&1 || pip install -r "$ROOT_DIR/app/requirements.txt"
+  # Ensure worker deps like yt-dlp present
+  pip show -q yt_dlp >/dev/null 2>&1 || pip install -r "$ROOT_DIR/app/requirements.txt"
   fi
 }
 
@@ -80,23 +82,37 @@ start_mcp() {
   # choose an available port starting at MCP_PORT or 9100
   base_port=${MCP_PORT:-9100}
   chosen_port=""
-  for p in $(seq "$base_port" $((base_port+20))); do
+  for p in $(seq "$base_port" $((base_port+50))); do
     if ! lsof -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then
       chosen_port="$p"
       break
     fi
   done
   if [ -z "$chosen_port" ]; then
-    echo "No free port found for MCP in range $base_port-$((base_port+20))" >&2
+    echo "No free port found for MCP in range $base_port-$((base_port+50))" >&2
     exit 1
   fi
   export FLASK_RUN_PORT="$chosen_port"
-  echo "Starting MCP server on $FLASK_RUN_HOST:$FLASK_RUN_PORT..."
+  echo "$chosen_port" > "$RUN_DIR/mcp.port"
+  export MCP_PORT="$chosen_port"
+  export MCP_URL="http://127.0.0.1:$chosen_port/api"
+  echo "Starting MCP server on $FLASK_RUN_HOST:$FLASK_RUN_PORT... (MCP_URL=$MCP_URL)"
   nohup python -m flask run >"$LOG_DIR/mcp.log" 2>&1 &
   write_pid mcp "$!"
   echo "MCP PID: $(read_pid mcp) (logs: $LOG_DIR/mcp.log)"
   if [ "$chosen_port" != "$base_port" ]; then
-    echo "Note: requested port $base_port was busy; started on $chosen_port instead. Set MCP_PORT to override."
+    echo "Note: requested port $base_port was busy; started on $chosen_port instead."
+  fi
+}
+
+set_mcp_from_file() {
+  if [ -f "$RUN_DIR/mcp.port" ]; then
+    local p
+    p=$(cat "$RUN_DIR/mcp.port")
+    if [ -n "$p" ]; then
+      export MCP_PORT="$p"
+      : "${MCP_URL:=http://127.0.0.1:$p/api}"
+    fi
   fi
 }
 
@@ -139,13 +155,26 @@ case "$MODE" in
   mcp)
     start_mcp ;;
   all|up)
+    start_mcp
+    set_mcp_from_file
     start_app_dev
-    start_worker
-    start_mcp ;;
+    start_worker ;;
   stop)
-    stop_one mcp
-    stop_one worker
-    stop_one app ;;
+    # Strong stop: stop known PIDs, then kill by pattern and ports
+    stop_one mcp || true
+    stop_one worker || true
+    stop_one app || true
+    # Kill lingering processes by pattern
+    pkill -f "python -m app.app" 2>/dev/null || true
+    pkill -f "gunicorn .*app.wsgi" 2>/dev/null || true
+    pkill -f "flask run.*mcp_server.app" 2>/dev/null || true
+    # Free ports
+    fuser -k 8000/tcp 2>/dev/null || true
+    if [ -f "$RUN_DIR/mcp.port" ]; then
+      MCP_P=$(cat "$RUN_DIR/mcp.port")
+      fuser -k "$MCP_P"/tcp 2>/dev/null || true
+    fi
+    echo "All services stopped." ;;
   status)
     status ;;
   *)

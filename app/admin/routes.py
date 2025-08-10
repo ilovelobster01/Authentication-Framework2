@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
 from flask_login import login_required, current_user
-from ..models import db, User, UserCertificate, AuditLog
+from ..models import db, User, UserCertificate, AuditLog, DownloadRecord
 from ..security import PasswordSecurity
 from .. import cert_utils as cu
 from .forms import CreateUserForm, ResetPasswordForm, ToggleActiveForm, ResetTOTPForm, UnbindCertForm, BindCurrentCertForm, IssueClientCertForm, CertFilterForm
@@ -293,6 +293,20 @@ def audit_index():
     # admin_required is enforced in before_request of blueprint/app
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(200).all()
     return render_template('admin/audit.html', logs=logs)
+
+@admin_bp.get('/downloaders')
+@login_required
+def downloaders_index():
+    # List all downloads across users with basic filters
+    q = DownloadRecord.query.join(User, User.id == DownloadRecord.user_id)
+    uname = request.args.get('username','').strip()
+    status = request.args.get('status','').strip().lower()
+    if uname:
+        q = q.filter(User.username.ilike(f"%{uname}%"))
+    if status:
+        q = q.filter(DownloadRecord.status.ilike(f"%{status}%"))
+    items = q.order_by(DownloadRecord.created_at.desc()).limit(500).all()
+    return render_template('admin/downloaders.html', items=items, username=uname, status=status)
 
 @admin_bp.get('/queue')
 @login_required

@@ -15,7 +15,7 @@ from . import cert_utils as cu
 from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 
-from .models import db, User, UserCertificate, AuditLog, RememberDevice
+from .models import db, User, UserCertificate, AuditLog, RememberDevice, DownloadRecord
 from .security import PasswordSecurity
 import pyotp
 import qrcode
@@ -99,7 +99,10 @@ def create_app():
         rd = RememberDevice(user_id=user.id, token_hash=h, user_agent=request.headers.get('User-Agent'), ip=request.headers.get('X-Forwarded-For', request.remote_addr), expires_at=exp)
         db.session.add(rd)
         db.session.commit()
-        resp.set_cookie(REMEMBER_COOKIE, tok, max_age=REMEMBER_DAYS*24*3600, httponly=True, secure=True, samesite='Lax', path='/')
+        # Set cookie; mark secure when behind HTTPS (direct or via proxy)
+        xf_proto = (request.headers.get('X-Forwarded-Proto') or '').lower()
+        is_secure = request.is_secure or xf_proto == 'https'
+        resp.set_cookie(REMEMBER_COOKIE, tok, max_age=REMEMBER_DAYS*24*3600, httponly=True, secure=is_secure, samesite='Lax', path='/')
         return resp
 
     def check_remember_cookie(user: User) -> bool:
@@ -256,8 +259,10 @@ def create_app():
     @csrf.exempt
     @app.post("/2fa/verify")
     def verify_2fa():
-        from flask import session
-        code = (request.get_json(force=True) or {}).get("code")
+        from flask import session, make_response
+        data = request.get_json(force=True) or {}
+        code = data.get("code")
+        remember_flag = bool(data.get("remember_device"))
         if not code:
             abort(400, description="code required")
         uid = session.get("pending_2fa_user_id")
@@ -271,6 +276,9 @@ def create_app():
             abort(401, description="invalid code")
         session.pop("pending_2fa_user_id", None)
         login_user(user)
+        if remember_flag:
+            resp = make_response({"status": "ok"}, 200)
+            return set_remember_cookie(resp, user)
         return {"status": "ok"}, 200
 
     @app.get("/2fa/setup")
@@ -326,6 +334,75 @@ def create_app():
     @login_required
     def profile_page():
         return render_template('profile.html', user=current_user)
+
+    @app.get('/downloads')
+    @login_required
+    def downloads_page():
+        import shutil as _sh
+        items = DownloadRecord.query.filter_by(user_id=current_user.id).order_by(DownloadRecord.created_at.desc()).all()
+        have_ffmpeg = bool(_sh.which('ffmpeg'))
+        return render_template('downloads.html', downloads=items, have_ffmpeg=have_ffmpeg)
+
+    @csrf.exempt
+    @app.post('/downloads/analyze')
+    @login_required
+    def downloads_analyze():
+        data = request.get_json(force=True) or {}
+        url = data.get('url')
+        if not url:
+            abort(400, description='url required')
+        # call MCP analyze
+        import requests as _rq
+        try:
+            mcp_base = os.environ.get('MCP_URL') or f"http://127.0.0.1:{os.environ.get('MCP_PORT','9100')}"
+            base = mcp_base.rstrip('/')
+            # If base already ends with /api, don't duplicate segment
+            mcp_url = base + ('/yt/analyze' if base.endswith('/api') else '/api/yt/analyze')
+            token = os.environ.get('MCP_TOKEN') or ''
+            r = _rq.post(mcp_url, json={'url': url}, headers={'Authorization': f'Bearer {token}'}, timeout=30)
+            status = r.status_code
+            try:
+                payload = r.json()
+            except Exception:
+                payload = {'message': 'MCP returned non-JSON', 'body': r.text[:500], 'mcp_url': mcp_url}
+            return payload, status
+        except Exception as e:
+            return {'message': 'Failed to reach MCP analyze endpoint', 'error': str(e)}, 502
+
+    @csrf.exempt
+    @app.post('/downloads/create')
+    @login_required
+    def downloads_create():
+        data = request.get_json(force=True) or {}
+        url = data.get('url'); fmt = data.get('format'); filename = data.get('filename')
+        if not url:
+            abort(400, description='url required')
+        # enqueue via MCP
+        import requests as _rq
+        try:
+            mcp_base = os.environ.get('MCP_URL') or f"http://127.0.0.1:{os.environ.get('MCP_PORT','9100')}"
+            base = mcp_base.rstrip('/')
+            mcp_url = base + ('/jobs' if base.endswith('/api') else '/api/jobs')
+            token = os.environ.get('MCP_TOKEN') or ''
+            args = {'user_id': current_user.id, 'url': url, 'format': fmt, 'filename': filename}
+            r = _rq.post(mcp_url, json={'tool':'yt_download','args': args}, headers={'Authorization': f'Bearer {token}'}, timeout=30)
+            status = r.status_code
+            try:
+                body = r.json()
+            except Exception:
+                body = {'message': 'MCP returned non-JSON', 'body': r.text[:500], 'mcp_url': mcp_url}
+            return body, status
+        except Exception as e:
+            return {'message': 'Failed to reach MCP jobs endpoint', 'error': str(e)}, 502
+
+    @app.get('/downloads/file/<int:download_id>')
+    @login_required
+    def download_file(download_id: int):
+        rec = DownloadRecord.query.filter_by(id=download_id, user_id=current_user.id).first_or_404()
+        if not rec.filepath or not os.path.exists(rec.filepath):
+            abort(404)
+        from flask import send_file
+        return send_file(rec.filepath, as_attachment=True, download_name=rec.filename)
 
     @app.get('/profile/devices')
     @login_required

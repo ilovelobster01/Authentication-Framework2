@@ -47,6 +47,12 @@ install -m 644 "$CA_CRL_SRC" "$CA_CRL"
 install -m 644 "$SRV_CRT_SRC" "$SRV_CRT"
 install -m 640 -g www-data "$SRV_KEY_SRC" "$SRV_KEY"
 
+# Stop interfering local processes (app dev server, gunicorn, MCP dev server)
+if pgrep -f "python -m app.app" >/dev/null 2>&1; then pkill -f "python -m app.app" || true; fi
+if pgrep -f "gunicorn .*app.wsgi" >/dev/null 2>&1; then pkill -f "gunicorn .*app.wsgi" || true; fi
+if pgrep -f "flask run.*mcp_server.app" >/dev/null 2>&1; then pkill -f "flask run.*mcp_server.app" || true; fi
+fuser -k 8000/tcp 2>/dev/null || true
+
 # Write Nginx HTTPS site config (always overwrite to ensure consistency)
 mkdir -p "$SITE_AVAIL" "$SITE_EN"
 cat >"$SITE_AVAIL/$SITE_NAME" <<EOF

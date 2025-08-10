@@ -17,3 +17,4 @@ requests==2.32.3
 redis==5.0.7
 rq==1.16.1
 fakeredis==2.23.2
+yt-dlp>=2024.10.7

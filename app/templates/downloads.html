@@ -1,0 +1,52 @@
+{% extends 'layout.html' %}
+{% block title %}Downloads{% endblock %}
+{% block content %}
+<h1>Downloads</h1>
+<div class="panel">
+  <h2>New download</h2>
+  <p>
+    <label>URL<br><input type="text" id="dl-url" size="80"></label>
+    <button id="btn-analyze">Analyze</button>
+  </p>
+  <div id="analyze-result" class="hidden">
+    {% if not have_ffmpeg %}
+      <div class="flash error">ffmpeg not detected on server. Merging video+audio may fail. Choose video-only or audio-only, or install ffmpeg.</div>
+    {% endif %}
+    <p>Title: <span id="dl-title"></span></p>
+    <p>
+      Mode:
+      <label><input type="radio" name="mode" value="both" checked> Video + Audio (requires ffmpeg)</label>
+      <label><input type="radio" name="mode" value="video"> Video only</label>
+      <label><input type="radio" name="mode" value="audio"> Audio only</label>
+    </p>
+    <p>
+      Video format: <select id="video-format"></select>
+      Audio format: <select id="audio-format"></select>
+    </p>
+    <p>
+      File name (optional, without extension): <input type="text" id="dl-filename" size="40">
+      <button id="btn-enqueue">Enqueue Download</button>
+    </p>
+  </div>
+</div>
+
+<h2>Your downloads</h2>
+{% if downloads %}
+<table>
+  <tr><th>When</th><th>Title</th><th>Status</th><th>File</th><th>Error</th></tr>
+  {% for d in downloads %}
+  <tr>
+    <td>{{ d.created_at }}</td>
+    <td>{{ d.title }}</td>
+    <td>{{ d.status }}</td>
+    <td>{% if d.filepath %}<a href="{{ url_for('download_file', download_id=d.id) }}">{{ d.filename }}</a>{% endif %}</td>
+    <td>{% if d.error %}<pre>{{ d.error }}</pre>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No downloads yet.</p>
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/downloads.js') }}"></script>
+{% endblock %}

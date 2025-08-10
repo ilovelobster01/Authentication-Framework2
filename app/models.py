@@ -42,6 +42,7 @@ class User(UserMixin, db.Model):
 
     certificates = db.relationship("UserCertificate", backref="user", lazy=True)
     remembered_devices = db.relationship("RememberDevice", backref="user", lazy=True)
+    downloads = db.relationship("DownloadRecord", backref="user", lazy=True)
 
     def get_id(self):
         return str(self.id)
@@ -57,6 +58,23 @@ class RememberDevice(db.Model):
     ip = db.Column(db.String(64), nullable=True)
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class DownloadRecord(db.Model):
+    __tablename__ = "downloads"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    url = db.Column(db.Text, nullable=False)
+    title = db.Column(db.Text, nullable=True)
+    filename = db.Column(db.String(255), nullable=True)
+    filepath = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(32), default='queued', nullable=False)
+    job_id = db.Column(db.String(64), nullable=True, index=True)
+    error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
 
 
 class UserCertificate(db.Model):

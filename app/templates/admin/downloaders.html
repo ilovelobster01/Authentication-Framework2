@@ -1,0 +1,28 @@
+{% extends 'layout.html' %}
+{% block title %}Downloaders{% endblock %}
+{% block content %}
+<h1>All Downloads</h1>
+<form method="get" action="{{ url_for('admin.downloaders_index') }}">
+  <label>Username <input type="text" name="username" value="{{ username or '' }}" /></label>
+  <label>Status <input type="text" name="status" value="{{ status or '' }}" placeholder="queued|started|completed|failed"/></label>
+  <button type="submit">Filter</button>
+</form>
+{% if items %}
+<table>
+  <tr><th>When</th><th>User</th><th>URL</th><th>Title</th><th>Status</th><th>File</th><th>Error</th></tr>
+  {% for d in items %}
+    <tr>
+      <td>{{ d.created_at }}</td>
+      <td><a href="{{ url_for('admin.user_detail', user_id=d.user_id) }}">{{ d.user.username }}</a></td>
+      <td class="break-all-20">{{ d.url }}</td>
+      <td>{{ d.title }}</td>
+      <td>{{ d.status }}</td>
+      <td>{% if d.filepath %}<a href="{{ url_for('download_file', download_id=d.id) }}">{{ d.filename }}</a>{% endif %}</td>
+      <td>{% if d.error %}<pre class="pre-wrap-30">{{ d.error }}</pre>{% endif %}</td>
+    </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No downloads found.</p>
+{% endif %}
+{% endblock %}

@@ -34,6 +34,8 @@ th, td { border: 1px solid var(--muted); padding: 10px; }
 th { background: #1b2638; text-align: left; }
 form.inline { display: inline; }
 .hidden { display: none; }
+#combined-row select { min-width: 18rem; }
+#separate-row select { min-width: 12rem; }
 
 input, select, button { background: var(--panel); color: var(--text); border: 1px solid var(--muted); border-radius: 6px; padding: .5rem .6rem; }
 input:focus, select:focus { outline: 2px solid var(--accent-2); }

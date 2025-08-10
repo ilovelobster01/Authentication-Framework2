@@ -1,0 +1,21 @@
+{% extends 'layout.html' %}
+{% block title %}My Downloads{% endblock %}
+{% block content %}
+<h1>My Downloads</h1>
+{% if downloads %}
+<table>
+  <tr><th>When</th><th>Title</th><th>Status</th><th>File</th><th>Error</th></tr>
+  {% for d in downloads %}
+  <tr>
+    <td>{{ d.created_at }}</td>
+    <td>{{ d.title }}</td>
+    <td>{{ d.status }}</td>
+    <td>{% if d.filepath %}<a href="{{ url_for('download_file', download_id=d.id) }}">{{ d.filename }}</a>{% endif %}</td>
+    <td>{% if d.error %}<pre class="pre-wrap-40">{{ d.error }}</pre>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No downloads yet.</p>
+{% endif %}
+{% endblock %}

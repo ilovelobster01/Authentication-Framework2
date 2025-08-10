@@ -1,7 +1,7 @@
 {% extends 'layout.html' %}
-{% block title %}Downloads{% endblock %}
+{% block title %}Downloader{% endblock %}
 {% block content %}
-<h1>Downloads</h1>
+<h1>Downloader</h1>
 <p class="muted">Paste a URL, analyze formats, then choose a combined (single file) format or separate video+audio. Combined works best with ffmpeg installed.</p>
 <div class="panel">
   <h2>New download</h2>
@@ -9,6 +9,13 @@
     <label>URL<br><input type="text" id="dl-url" size="80"></label>
     <button id="btn-analyze">Analyze</button>
   </p>
+  <div>
+    <strong>Cookies:</strong> {% if have_cookies %}<span class="flash success">Loaded</span>{% else %}<span class="flash error">None</span>{% endif %}
+    <form id="cookies-form" enctype="multipart/form-data" method="post" action="{{ url_for('upload_cookies') }}" class="inline">
+      <input type="file" name="cookies" accept=".txt" />
+      <button type="submit">Upload cookies.txt</button>
+    </form>
+  </div>
   <div id="analyze-result" class="hidden">
     {% if not have_ffmpeg %}
       <div class="flash error">ffmpeg not detected on server. Merging video+audio may fail. Choose video-only or audio-only, or install ffmpeg.</div>
@@ -38,22 +45,20 @@
   </div>
 </div>
 
-<h2>Your downloads</h2>
-{% if downloads %}
+<h2>Current task</h2>
+{% if last_item %}
 <table>
   <tr><th>When</th><th>Title</th><th>Status</th><th>File</th><th>Error</th></tr>
-  {% for d in downloads %}
   <tr>
-    <td>{{ d.created_at }}</td>
-    <td>{{ d.title }}</td>
-    <td>{{ d.status }}</td>
-    <td>{% if d.filepath %}<a href="{{ url_for('download_file', download_id=d.id) }}">{{ d.filename }}</a>{% endif %}</td>
-    <td>{% if d.error %}<pre>{{ d.error }}</pre>{% endif %}</td>
+    <td>{{ last_item.created_at }}</td>
+    <td>{{ last_item.title }}</td>
+    <td>{{ last_item.status }}</td>
+    <td>{% if last_item.filepath %}<a href="{{ url_for('download_file', download_id=last_item.id) }}">{{ last_item.filename }}</a>{% endif %}</td>
+    <td>{% if last_item.error %}<pre class="pre-wrap-40">{{ last_item.error }}</pre>{% endif %}</td>
   </tr>
-  {% endfor %}
 </table>
 {% else %}
-<p>No downloads yet.</p>
+<p>No tasks yet.</p>
 {% endif %}
 
 <script src="{{ url_for('static', filename='js/downloads.js') }}"></script>

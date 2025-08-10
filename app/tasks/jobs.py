@@ -64,6 +64,8 @@ def yt_download(user_id: int, url: str, format: Optional[str] = None, filename: 
                 import yt_dlp as ydl
                 outtmpl = (filename or '%(title)s') + '.%(ext)s'
                 have_ffmpeg = bool(shutil.which('ffmpeg'))
+                # Add cookies file if present for this user
+                cookies_path = os.path.abspath(os.path.join(out_base, 'cookies', str(user_id), 'cookies.txt'))
                 ydl_opts = {
                     'format': format or 'bestvideo+bestaudio/best',
                     'prefer_free_formats': True,
@@ -71,6 +73,7 @@ def yt_download(user_id: int, url: str, format: Optional[str] = None, filename: 
                     'paths': {'home': user_dir},
                     'quiet': True,
                     'noprogress': True,
+                    **({'cookiefile': cookies_path} if os.path.exists(cookies_path) else {}),
                 }
                 if have_ffmpeg:
                     ydl_opts['merge_output_format'] = 'mp4'
@@ -80,6 +83,8 @@ def yt_download(user_id: int, url: str, format: Optional[str] = None, filename: 
                 candidates = []
                 if format:
                     candidates.append(format)
+                # If the chosen format is a simple numeric id (common for yt), map to that id directly
+                # Otherwise, keep as compound or keywords
                 if have_ffmpeg:
                     candidates.append('bestvideo+bestaudio/best')
                 candidates.append('best')

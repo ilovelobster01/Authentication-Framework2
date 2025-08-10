@@ -335,13 +335,37 @@ def create_app():
     def profile_page():
         return render_template('profile.html', user=current_user)
 
-    @app.get('/downloads')
+    @app.get('/downloader')
     @login_required
-    def downloads_page():
-        import shutil as _sh
-        items = DownloadRecord.query.filter_by(user_id=current_user.id).order_by(DownloadRecord.created_at.desc()).all()
+    def downloader_page():
+        import shutil as _sh, os as _os
         have_ffmpeg = bool(_sh.which('ffmpeg'))
-        return render_template('downloads.html', downloads=items, have_ffmpeg=have_ffmpeg)
+        last_item = DownloadRecord.query.filter_by(user_id=current_user.id).order_by(DownloadRecord.created_at.desc()).first()
+        cookies_path = _os.path.abspath(_os.path.join('downloads','cookies', str(current_user.id), 'cookies.txt'))
+        have_cookies = _os.path.exists(cookies_path)
+        return render_template('downloader.html', last_item=last_item, have_ffmpeg=have_ffmpeg, have_cookies=have_cookies)
+
+    @app.get('/my_downloads')
+    @login_required
+    def my_downloads_page():
+        items = DownloadRecord.query.filter_by(user_id=current_user.id).order_by(DownloadRecord.created_at.desc()).all()
+        return render_template('my_downloads.html', downloads=items)
+
+    @csrf.exempt
+    @app.post('/downloads/cookies')
+    @login_required
+    def upload_cookies():
+        from werkzeug.utils import secure_filename
+        import os as _os
+        f = request.files.get('cookies')
+        if not f:
+            abort(400, description='cookies file required')
+        user_dir = _os.path.abspath(_os.path.join('downloads','cookies', str(current_user.id)))
+        _os.makedirs(user_dir, exist_ok=True)
+        path = _os.path.join(user_dir, 'cookies.txt')
+        f.save(path)
+        flash('Cookies uploaded', 'success')
+        return redirect(url_for('downloader_page'))
 
     @csrf.exempt
     @app.post('/downloads/analyze')

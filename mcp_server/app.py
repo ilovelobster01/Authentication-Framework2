@@ -24,6 +24,17 @@ def create_app():
     @app.post('/api/yt/analyze')
     @app.post('/yt/analyze')
     def yt_analyze():
+        raw_flag = False
+        # Accept raw flag via JSON or query string
+        try:
+            body = request.get_json(silent=True) or {}
+            raw_flag = bool(body.get('raw'))
+            url = body.get('url')
+        except Exception:
+            url = None
+        if url is None:
+            url = request.args.get('url')
+            raw_flag = raw_flag or (request.args.get('raw') in ('1','true','yes'))
         if not auth(request):
             return {'message':'Unauthorized'}, 401
         data = request.get_json(force=True)
@@ -35,34 +46,51 @@ def create_app():
             opts = {'skip_download': True, 'quiet': True, 'noprogress': True}
             with ydl.YoutubeDL(opts) as y:
                 info = y.extract_info(url, download=False)
-            # Filter into valid video-only and audio-only formats
+            # Filter into valid video-only and audio-only formats, be permissive about ext
             video_formats = []
             audio_formats = []
             def add_vid(f):
                 video_formats.append({
-                    'format_id': f.get('format_id'), 'ext': f.get('ext'), 'height': f.get('height'), 'fps': f.get('fps')
+                    'format_id': f.get('format_id'), 'ext': f.get('ext') or '', 'height': f.get('height'), 'fps': f.get('fps')
                 })
             def add_aud(f):
                 audio_formats.append({
-                    'format_id': f.get('format_id'), 'ext': f.get('ext'), 'acodec': f.get('acodec')
+                    'format_id': f.get('format_id'), 'ext': f.get('ext') or '', 'acodec': f.get('acodec')
                 })
             for f in info.get('formats', []):
-                fid = f.get('format_id'); ext = f.get('ext'); v = f.get('vcodec'); a = f.get('acodec'); proto = f.get('protocol')
-                if not fid or not ext:
+                fid = f.get('format_id'); v = f.get('vcodec'); a = f.get('acodec'); proto = f.get('protocol')
+                if not fid:
                     continue
-                # Skip only HLS variants; allow DASH, which yt-dlp can download
+                # Skip only HLS variants; allow DASH and others
                 if proto in ('m3u8', 'm3u8_native'):
                     continue
                 # Video-only candidates (common ids like 137/248 etc.)
-                if v and v != 'none' and (a in (None, 'none')) and ext in ('mp4','webm','mkv'):
+                if v and v != 'none' and (a in (None, 'none')):
                     add_vid(f)
                 # Audio-only candidates (common ids like 140/251 etc.)
-                if a and a != 'none' and (v in (None, 'none')) and ext in ('m4a','mp3','opus','webm','aac'):
+                if a and a != 'none' and (v in (None, 'none')):
                     add_aud(f)
-            # Always include fallbacks at the top
+            # Progressive combined (single file) formats: both vcodec & acodec present, not HLS
+            progressive_formats = []
+            for f in info.get('formats', []):
+                fid = f.get('format_id'); v = f.get('vcodec'); a = f.get('acodec'); proto = f.get('protocol')
+                if not fid:
+                    continue
+                if proto in ('m3u8', 'm3u8_native'):
+                    continue
+                if v and v != 'none' and a and a != 'none':
+                    progressive_formats.append({
+                        'format_id': fid, 'ext': f.get('ext') or '', 'height': f.get('height'), 'fps': f.get('fps')
+                    })
+            # Always include fallbacks at the top for separate streams
             video_formats = [{'format_id': 'bestvideo', 'ext': '', 'height': None, 'fps': None}] + video_formats
             audio_formats = [{'format_id': 'bestaudio', 'ext': '', 'acodec': None}] + audio_formats
-            return {'title': info.get('title'), 'video_formats': video_formats, 'audio_formats': audio_formats}, 200
+            return {
+                'title': info.get('title'),
+                'progressive_formats': progressive_formats,
+                'video_formats': video_formats,
+                'audio_formats': audio_formats
+            }, 200
         except Exception as e:
             return {'message': 'analyze failed', 'error': str(e)}, 500
 
